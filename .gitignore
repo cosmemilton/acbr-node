@@ -1,0 +1,22 @@
+node_modules/
+dist/
+.acbr/
+native/generated/
+*.o
+*.ppu
+*.exe
+*.tgz
+*.compiled
+*.log
+acbr.windows.config.json
+acbr.ci.windows.config.json
+packages/*/runtime/
+
+# Credenciais locais
+*.pfx
+*.p12
+*.key
+.env
+.env.*
+!.env.example
+.npmrc

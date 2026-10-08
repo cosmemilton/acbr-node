@@ -1,0 +1,27 @@
+{
+  "name": "@cosmemilton/acbr-node-win32-x64",
+  "version": "0.1.0",
+  "license": "LGPL-2.1-or-later",
+  "description": "Motor ACBr win32 x64 para @cosmemilton/acbr-node",
+  "os": [
+    "win32"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "engines": {
+    "node": ">=22.12"
+  },
+  "files": [
+    "runtime",
+    "LICENSE",
+    "NOTICE",
+    "README.md"
+  ],
+  "exports": {
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

@@ -1,0 +1,8 @@
+ACBr Node — integração Node.js/Free Pascal para os componentes ACBr.
+Copyright 2026 Cosmemilton e colaboradores.
+
+Este projeto usa os fontes públicos do Projeto ACBr, sob LGPL 2.1 ou posterior.
+Os avisos originais das unidades e as licenças das dependências são preservados.
+Fontes: https://svn.code.sf.net/p/acbr/code/trunk2
+A revisão exata, hashes e materiais de reconstrução acompanham cada runtime.
+Não é um pacote oficial do Projeto ACBr. Não depende de Delphi nem dos binários ACBr Pro.

@@ -1,0 +1,73 @@
+name: Validate Windows native build with free tools
+on:
+  workflow_dispatch:
+    inputs:
+      source_revision:
+        description: Official SVN revision to build explicitly
+        required: true
+        default: '48590'
+permissions:
+  contents: read
+jobs:
+  dependencies:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: sudo apt-get update && sudo apt-get install -y gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 binutils-mingw-w64-x86-64 cmake ninja-build make perl curl tar xz-utils
+      - run: node scripts/build-native-deps.mjs --jobs 4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-free-native-dependencies
+          path: .acbr/deps/win32-x64/
+          if-no-files-found: error
+  windows:
+    needs: dependencies
+    # Install the official free toolchain on this runner; see docs/CI.md.
+    runs-on: [self-hosted, Windows, X64, acbr-toolchain]
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: powershell
+    env:
+      FPC_ROOT: ${{ vars.FPC_ROOT }}
+      LAZARUS_ROOT: ${{ vars.LAZARUS_ROOT }}
+      SOURCE_REVISION: ${{ inputs.source_revision }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-free-native-dependencies
+          path: .acbr/deps/win32-x64
+      - run: ./scripts/prepare-windows-build.ps1 -Revision ([int]$env:SOURCE_REVISION)
+      - run: npm ci --omit=optional
+      - run: npm run build:cli
+      - run: node dist/cli.js --config acbr.ci.windows.config.json source update --revision $env:SOURCE_REVISION
+      - run: node dist/cli.js --config acbr.ci.windows.config.json generate
+      - run: npm run build
+      - run: node dist/cli.js --config acbr.ci.windows.config.json build
+      - run: node dist/cli.js --config acbr.ci.windows.config.json check
+      - run: node dist/cli.js --config acbr.ci.windows.config.json doctor
+      - run: npm test
+      - run: node --import tsx scripts/build-test-worker.mjs acbr.ci.windows.config.json
+      - run: |
+          $env:ACBR_NODE_RUNTIME_DIR = Join-Path $PWD '.acbr/test-runtime/win32-x64'
+          $env:ACBR_NATIVE_TEST = '1'
+          npm run test:native
+      - run: node scripts/pack-runtimes.mjs
+      - run: |
+          New-Item -ItemType Directory -Path '.acbr/artifacts' -Force | Out-Null
+          npm pack --pack-destination .acbr/artifacts
+          Push-Location packages/acbr-node-win32-x64
+          try { npm pack --pack-destination ../../.acbr/artifacts } finally { Pop-Location }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: npm-windows-artifacts
+          path: .acbr/artifacts/*.tgz
+          if-no-files-found: error

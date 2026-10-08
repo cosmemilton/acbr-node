@@ -1,0 +1,42 @@
+name: Validate Linux build and npm artifacts
+on:
+  workflow_dispatch:
+    inputs:
+      source_revision:
+        description: Official SVN revision to build explicitly
+        required: true
+        default: '48590'
+      consumer_revision:
+        description: Official SVN revision for independent consumer validation
+        required: true
+        default: '48589'
+permissions:
+  contents: read
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    env:
+      SOURCE_REVISION: ${{ inputs.source_revision }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: sudo apt-get update && sudo apt-get install -y fp-compiler fp-units-fcl fp-units-net fp-units-misc lcl-nogui lazarus-ide libssl-dev libxml2-dev subversion ca-certificates
+      - run: npm ci --omit=optional
+      - run: npm run build:cli
+      - run: node dist/cli.js source update --revision "$SOURCE_REVISION"
+      - run: node dist/cli.js generate
+      - run: npm run build
+      - run: node dist/cli.js build
+      - run: node dist/cli.js check
+      - run: npm test
+      - run: node --import tsx scripts/build-test-worker.mjs
+      - run: ACBR_NODE_RUNTIME_DIR="$PWD/.acbr/test-runtime/linux-x64" ACBR_NATIVE_TEST=1 npm run test:native
+      - run: node scripts/validate-consumer.mjs --revision "$CONSUMER_REVISION"
+        env:
+          CONSUMER_REVISION: ${{ inputs.consumer_revision }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: npm-linux-artifacts
+          path: .acbr/artifacts/*.tgz

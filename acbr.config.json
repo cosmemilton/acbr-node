@@ -1,0 +1,16 @@
+{
+  "formatVersion": 1,
+  "source": {
+    "url": "https://svn.code.sf.net/p/acbr/code/trunk2",
+    "revision": 48590,
+    "directory": ".acbr/source"
+  },
+  "generator": {
+    "outputDir": "."
+  },
+  "native": {
+    "project": "native/acbr-worker.lpr",
+    "outputDir": ".acbr/runtime",
+    "fpc": "fpc"
+  }
+}
