@@ -22,11 +22,23 @@ jobs:
           node-version: '24'
           package-manager-cache: false
           registry-url: https://registry.npmjs.org
+      - name: Check npm staged publishing support
+        run: |
+          node --version
+          npm --version
+          npm stage --help
       - name: Download reviewed assets over HTTPS
         run: node scripts/npm-release-bundle.mjs --download .acbr/npm-download
       - name: Audit pinned tarballs and dry run
         run: node scripts/npm-release-bundle.mjs --dry-run .acbr/npm-download
-      - name: Publish runtimes followed by SDK
+      - name: Publish runtimes and SDK or verify pending npm approval
         run: node scripts/npm-release-bundle.mjs --publish .acbr/npm-download
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Save publication or pending approval result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-publication-result
+          path: .acbr/npm-download/PUBLICATION_RESULT.json
+          if-no-files-found: ignore
