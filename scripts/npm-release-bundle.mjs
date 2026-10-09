@@ -37,12 +37,32 @@ export function assertRegistryMatches(dist, data, name) {
   }
 }
 
+function npmErrorCode(result) {
+  return /(?:^|\n)npm (?:ERR!|error) code ([A-Z0-9_]+)(?:\r?\n|$)/.exec(result.stderr ?? '')?.[1];
+}
+
+export function classifyNpmError(result) {
+  const stderr = result.stderr ?? '';
+  if (/scope not found/i.test(stderr)) return 'scope-not-found';
+  if (/(?:permission|not allowed|unauthorized|access denied)/i.test(stderr)) return 'access-denied';
+  if (/(?:2fa|two-factor|one-time|otp)/i.test(stderr)) return 'two-factor-required';
+  if (npmErrorCode(result) === 'E404') return 'check-scope-and-token';
+  return undefined;
+}
+
 export function safeNpmError(result) {
-  const code = /(?:^|\n)npm (?:ERR!|error) code ([A-Z0-9_]+)(?:\r?\n|$)/.exec(result.stderr ?? '')?.[1];
+  const code = npmErrorCode(result);
   const detail = code ? `, ${code}` : '';
-  const guidance = ['EOTP', 'E401', 'E403', 'ENEEDAUTH'].includes(code)
-    ? ' Confira o secret NPM_TOKEN, as permissões dos três pacotes e a política de 2FA no npm.' : '';
-  return `exit ${result.code}${detail}.${guidance}`;
+  const errorCategory = result.errorCategory ?? classifyNpmError(result);
+  const hints = {
+    'scope-not-found': 'Confira se a conta npm autenticada possui o escopo @cosmemilton.',
+    'access-denied': 'Confira se o NPM_TOKEN permite criar e publicar os três pacotes no escopo @cosmemilton.',
+    'two-factor-required': 'Confira a política de 2FA e a permissão de publicação automatizada do NPM_TOKEN.',
+    'check-scope-and-token': 'Confira a conta autenticada, o escopo @cosmemilton e as permissões de criação/publicação do NPM_TOKEN.',
+  };
+  const guidance = hints[errorCategory] ?? (['EOTP', 'E401', 'E403', 'ENEEDAUTH'].includes(code)
+    ? 'Confira o secret NPM_TOKEN, as permissões dos três pacotes e a política de 2FA no npm.' : '');
+  return `exit ${result.code}${detail}${errorCategory ? `, categoria ${errorCategory}` : ''}.${guidance ? ' ' + guidance : ''}`;
 }
 
 async function run(command, args, { allowFailure = false, env = process.env } = {}) {
@@ -55,6 +75,7 @@ async function run(command, args, { allowFailure = false, env = process.env } = 
     child.on('close', code => resolve({ code, stdout, stderr }));
   });
   // npm output is deliberately not echoed: authentication errors must not expose credentials.
+  if (command === 'npm') result.errorCategory = classifyNpmError(result);
   if (result.code !== 0 && !allowFailure) throw Error(`${command} ${args[0]} falhou: ${command === 'npm' ? safeNpmError(result) : `exit ${result.code}.`}`);
   return result;
 }
@@ -172,7 +193,9 @@ export async function publishBundle(entries, version, {
   pause = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds)),
 } = {}) {
   if (!hasToken) throw Error('NODE_AUTH_TOKEN ausente no passo de publicação.');
-  await npm('npm', ['whoami', '--registry', registry, '--loglevel', 'error']);
+  const authentication = await npm('npm', ['whoami', '--registry', registry, '--loglevel', 'error']);
+  const username = authentication.stdout?.trim();
+  if (username && /^[a-z0-9_-]+$/i.test(username)) console.log(`::notice::Conta npm autenticada: ${username}`);
   const existing = [];
   // Detect every published-version conflict before publishing any missing package.
   for (const entry of entries) {
