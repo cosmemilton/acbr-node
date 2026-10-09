@@ -9,4 +9,4 @@ Projeto independente em /home/milton/acbr-node. Biblioteca npm gratuita LGPL-2.1
 - Nenhuma alteração no Integrador ou fontes Delphi existentes está autorizada por este projeto.
 - Testar pacote instalado fora do repositório, geração determinística, quebras de contrato e motores Linux/Windows. Registrar homologação fiscal real separadamente.
 
-- Decisão do usuário em 08/10/2026: preparar o projeto e os tarballs para revisão. Publicação npm exige nova autorização após essa revisão; dry-run e auditorias estão autorizados.
+- Decisão do usuário em 09/10/2026: publicação npm autorizada após revisão, com automação pela branch `release`. O secret `NPM_TOKEN` pertence ao repositório GitHub; não ler, registrar nem copiar seu valor. Publicar somente os tarballs auditados e identificados por hashes em `release/<versão>/manifest.json`.

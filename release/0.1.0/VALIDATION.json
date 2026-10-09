@@ -1,0 +1,113 @@
+{
+  "version": "0.1.0",
+  "publication": "authorized",
+  "sourceRevision": 48590,
+  "sourceHash": "6b768e4f45b4092d040f7576d6fb799d8b66b45ae29a0902c37334fb7c5c6816",
+  "contractHash": "e5a497cefe8e0e350a30da5cc04e88b35c38a98535893d52f878890260d1346d",
+  "generatedModels": 204,
+  "checks": {
+    "typescript": "passed",
+    "nodeGeneratorCliReleaseAudit": {
+      "passed": 32,
+      "skippedNativeOptIn": 4
+    },
+    "linuxNative": {
+      "passed": 52
+    },
+    "windowsNative": {
+      "passed": 52
+    },
+    "installedLinux": {
+      "node": [
+        "22.12.0",
+        "24.15.0"
+      ],
+      "formats": [
+        "esm",
+        "commonjs"
+      ],
+      "emitters": 2,
+      "models": [
+        55,
+        65
+      ],
+      "operations": [
+        "gerarXml",
+        "assinar",
+        "validar"
+      ],
+      "compilerPathAbsent": true
+    },
+    "installedWindows": {
+      "node": [
+        "22.12.0"
+      ],
+      "formats": [
+        "esm",
+        "commonjs"
+      ],
+      "emitters": 2,
+      "models": [
+        55,
+        65
+      ],
+      "operations": [
+        "gerarXml",
+        "assinar",
+        "validar"
+      ],
+      "compilerPathAbsent": true
+    },
+    "customConsumerRevision": 48589,
+    "cliOffline": {
+      "platforms": [
+        "linux",
+        "win32"
+      ],
+      "node": "22.12.0",
+      "passedPerPlatform": 4,
+      "networkTransmission": false
+    },
+    "nativeWindowsExtractor": {
+      "platform": "win32",
+      "format": "PE",
+      "generatedTypes": 204,
+      "fileHashesMatchLinux": true
+    },
+    "windowsSupervisor": {
+      "node": "22.12.0",
+      "passed": 8
+    },
+    "releaseAutomation": {
+      "passed": 6,
+      "partialPublicationRecovery": true,
+      "conflictingRegistryDigestsRefused": true,
+      "unsafeTarExtractionRefused": true,
+      "sanitizedNpmDiagnostics": true,
+      "delayedRegistryConfirmationWithoutRepublish": true
+    }
+  },
+  "limitations": [
+    "No real SEFAZ transmission or fiscal homologation.",
+    "Clean container image and remote CI not executed.",
+    "TLS revocation CRL/OCSP not implemented."
+  ],
+  "artifacts": [
+    {
+      "file": "cosmemilton-acbr-node-linux-x64-0.1.0.tgz",
+      "bytes": 51569712,
+      "sha256": "efa796aad7e8bf9b7f9f14c4da28f74f495be3dd9bb8c14330a3955a95ffef69"
+    },
+    {
+      "file": "cosmemilton-acbr-node-win32-x64-0.1.0.tgz",
+      "bytes": 33668389,
+      "sha256": "b1b41ccd90dc50d9697149450965c16b4a72f4f134c0bb634ddfae6262ae8e1b"
+    },
+    {
+      "file": "cosmemilton-acbr-node-0.1.0.tgz",
+      "bytes": 519887,
+      "sha256": "81170222812ee5434c9f596dae00c85c4cc823237d1a2860d2af2e5f87ae4c1d"
+    }
+  ],
+  "publicationAuthorizedOn": "2026-10-09"
+}

@@ -1,6 +1,6 @@
 # Validação da implementação
 
-Estado registrado em 08/10/2026 para a proposta **0.1.0**, preparada para revisão. Os artefatos locais ainda não foram publicados no npm. A publicação depende da revisão do usuário e de autorização posterior.
+Validações registradas em 08/10/2026 para a versão **0.1.0**. A publicação npm e sua automação pela branch `release` foram autorizadas pelo usuário em **09/10/2026**. Os artefatos estão preparados; a publicação ainda não foi executada neste registro.
 
 O snapshot principal usa ACBr SVN **48590** e **204 tipos gerados**. O contrato é:
 
@@ -27,8 +27,8 @@ Revisão e inventário dos fontes constam em `acbr.lock.json`. O manifesto `.acb
 | Motor Windows | Compilação e **rodada final de 52 testes aprovadas**: 20 do motor XML/A1/protocolo, sete TLS e 25 SOAP. Inclui NFC-e autorizada simulada (cStat 100), assinatura/QRCode/UTF-8 correlacionados e encerramento ao morrer o supervisor. |
 | Consumidor Windows com Node mínimo | **ESM e CommonJS aprovados com Node 22.12.0** em diretório externo. Cada formato executou quatro documentos (dois CNPJs × modelos 55/65) e 12 operações offline. O processo consumidor tinha apenas Node no `PATH`; o worker e as DLLs vieram do runtime instalado, sem execução de compiladores ou fontes do checkout. |
 | Distribuição e licenças | **7 testes de auditoria aprovados**, staging real Linux/Windows conferido e pack/dry-run dos três pacotes aprovados. Fontes, licenças e runtime inventariados. Tarballs de revisão em `.acbr/release-artifacts`: SDK cerca de 484 KiB, Linux 50 MiB e Windows 33 MiB. |
-| Docker / CI remota | **Não executados**. O Docker Desktop não tinha daemon disponível; nenhuma execução remota de CI foi feita. |
-| Publicação npm | **Não executada**. Aguarda revisão e autorização posterior do usuário. |
+| Docker / CI remota dos motores | **Não executados**. O Docker Desktop não tinha daemon disponível; os motores foram validados localmente em Linux/Windows. O workflow de publicação audita e publica esses tarballs, sem reconstruir os motores. |
+| Publicação npm | **Autorizada em 09/10/2026**, ainda não executada neste registro. A automação da branch `release` confere os tarballs contra hashes fixados em `release/0.1.0/manifest.json`. |
 
 A execução final de `npm test` teve **32 testes aprovados e quatro suítes opt-in ignoradas**: seis do gerador, 11 da CLI/configuração/fontes, oito do supervisor e sete de auditoria. Os testes nativos foram habilitados e executados separadamente: **52 Linux + 52 Windows**, sem falhas.
 
@@ -42,13 +42,15 @@ No Linux, `LD_DEBUG=libs` confirmou OpenSSL, libxml2, ICU, zlib, liblzma, libgcc
 
 Relatórios locais:
 
-- `/home/milton/acbr-node-runtime-consumer-linux-final/report-esm.json` e `report-cjs.json`: Node 24.15.0.
-- `/home/milton/acbr-node-runtime-consumer-linux-node22/report-esm.json` e `report-cjs.json`: Node 22.12.0.
+- `.acbr/validation-evidence/consumers/acbr-node-runtime-consumer-linux-final/report-esm.json` e `report-cjs.json`: Node 24.15.0.
+- `.acbr/validation-evidence/consumers/acbr-node-runtime-consumer-linux-node22/report-esm.json` e `report-cjs.json`: Node 22.12.0.
 - `C:\SRI_SERVICES\acbr-node-runtime-consumer-win32-node22-final\report-esm.json` e `report-cjs.json`: Windows com Node 22.12.0.
 - `C:\SRI_SERVICES\acbr-node-generator-win32-final\generate.log`: geração FCL-passrc executada nativamente no Windows.
 - `.acbr/finish-consumer.log`: geração pela fábrica do consumidor r48589.
 - `.acbr/final-release-staging-audit.log`: inventário final de distribuição Linux/Windows.
 - `.acbr/cli-check-linux-offline.json` e `.acbr/cli-check-windows-offline.json`: hashes do runtime e quatro probes reais do CLI por plataforma.
+
+As cinco pastas temporárias de consumidores Linux foram removidas após preservar seus relatórios, scripts, locks, modelos gerados e logs em `.acbr/validation-evidence/consumers/`. O arquivo `archive-manifest.json` registra os caminhos originais e os hashes SHA-256 dos arquivos preservados. Os caminhos dentro dos relatórios correspondem ao local da execução original. As fixtures de certificados sintéticos podem ser recriadas por `tests/package-install.mjs`.
 
 Os binários portáteis Node 22.12.0 de teste foram obtidos de `nodejs.org/dist/v22.12.0` e conferidos contra `SHASUMS256.txt`, sem alterar o Node padrão da máquina.
 
