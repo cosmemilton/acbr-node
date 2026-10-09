@@ -161,13 +161,18 @@ test('publication verifies delayed registry metadata without publishing twice', 
   const entry = { name: 'sdk', data: Buffer.from('sdk'), tarball: 'sdk.tgz' };
   const digest = { shasum: createHash('sha1').update(entry.data).digest('hex') };
   let lookups = 0, publications = 0;
-  await publishBundle([entry], '0.1.0', {
-    hasToken: true, pause: async () => {}, stageLookup: noStages,
+  const delays = [];
+  const result = await publishBundle([entry], '0.1.0', {
+    hasToken: true, pause: async milliseconds => { delays.push(milliseconds); }, stageLookup: noStages,
     npm: async (command, args) => { if (args[0] === 'publish') publications++; return { code: 0 }; },
-    lookup: async () => ++lookups < 8 ? null : digest,
+    lookup: async () => ++lookups < 45 ? null : digest,
   });
+  assert.equal(result.status, 'published');
   assert.equal(publications, 1);
-  assert.equal(lookups, 8);
+  assert.equal(lookups, 45);
+  assert.ok(delays.length > 40);
+  assert.ok(delays.every(milliseconds => milliseconds > 0 && milliseconds <= 10000));
+  assert.ok(delays.includes(10000));
 });
 
 test('an identical pending runtime is skipped while Windows publishes and the SDK stages its exact approved tarball', async () => {

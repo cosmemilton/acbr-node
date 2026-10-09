@@ -267,7 +267,9 @@ export async function publishBundle(entries, version, {
     }
     let dist;
     let staged;
-    const confirmationAttempts = result.code === 0 ? 15 : 3;
+    // The registry can take several minutes to expose an accepted new package.
+    // Poll for confirmation without submitting the same version again.
+    const confirmationAttempts = result.code === 0 ? 60 : 3;
     for (let attempt = 0; attempt < confirmationAttempts; attempt++) {
       if (attempt) await pause(Math.min(attempt * 1000, 10000));
       dist = await lookup(entry, version);
