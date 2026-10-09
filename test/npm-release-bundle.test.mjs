@@ -5,7 +5,7 @@ import { mkdtemp, rm, access, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { assertApprovedManifest, assertRegistryMatches, publishBundle, stagedArtifact, safeNpmError } from '../scripts/npm-release-bundle.mjs';
+import { assertApprovedManifest, assertRegistryMatches, dryRunBundle, publishBundle, stagedArtifact, safeNpmError } from '../scripts/npm-release-bundle.mjs';
 
 const version = '0.1.0';
 const stageId = '1de6f3db-2ed9-4d72-b3dd-8f0e2b474a2f';
@@ -85,6 +85,55 @@ test('reruns accept identical published bytes and refuse either conflicting npm 
   assert.throws(() => assertRegistryMatches({}, data, 'runtime'), /diverge/);
 });
 
+test('dry run skips an identical public Linux package and checks only missing tarballs without scripts or authentication', async () => {
+  const entries = releaseEntries();
+  const lookedUp = [];
+  const calls = [];
+  await dryRunBundle(entries, version, {
+    lookup: async (entry, requestedVersion) => {
+      assert.equal(requestedVersion, version);
+      lookedUp.push(entry.name);
+      return entry === entries[0] ? { shasum: digest(entry.data),
+        integrity: 'sha512-' + createHash('sha512').update(entry.data).digest('base64') } : null;
+    },
+    npm: async (command, args) => {
+      assert.equal(command, 'npm');
+      assert.deepEqual(lookedUp, entries.map(entry => entry.name), 'All public hashes must be checked before the first dry run.');
+      calls.push(args);
+      return { code: 0 };
+    },
+  });
+  assert.deepEqual(calls, entries.slice(1).map(entry => [
+    'publish', entry.tarball, '--dry-run', '--access', 'public', '--ignore-scripts', '--registry', registry, '--loglevel', 'error',
+  ]));
+});
+
+test('a conflicting public SDK digest prevents every dry run including missing runtimes', async () => {
+  const entries = releaseEntries();
+  const calls = [];
+  await assert.rejects(dryRunBundle(entries, version, {
+    lookup: async entry => entry === entries[2] ? { shasum: '0'.repeat(40) } : null,
+    npm: async (command, args) => { calls.push(args); return { code: 0 }; },
+  }), /diverge do tarball aprovado/);
+  assert.deepEqual(calls, []);
+});
+
+test('an entirely published release with identical bytes needs no npm dry run or authentication', async () => {
+  const entries = releaseEntries();
+  const lookedUp = [];
+  const calls = [];
+  await dryRunBundle(entries, version, {
+    lookup: async (entry, requestedVersion) => {
+      assert.equal(requestedVersion, version);
+      lookedUp.push(entry.name);
+      return { shasum: digest(entry.data) };
+    },
+    npm: async (command, args) => { calls.push(args); return { code: 0 }; },
+  });
+  assert.deepEqual(lookedUp, entries.map(entry => entry.name));
+  assert.deepEqual(calls, []);
+});
+
 test('partial publication skips identical runtime, publishes remaining packages in order and stops on conflicts before publishing', async () => {
   const entries = ['linux', 'windows', 'sdk'].map(name => ({ name, data: Buffer.from(name), tarball: name + '.tgz' }));
   const digests = Object.fromEntries(entries.map(entry => [entry.name, { shasum: createHash('sha1').update(entry.data).digest('hex') }]));
@@ -115,33 +164,68 @@ test('publication verifies delayed registry metadata without publishing twice', 
   await publishBundle([entry], '0.1.0', {
     hasToken: true, pause: async () => {}, stageLookup: noStages,
     npm: async (command, args) => { if (args[0] === 'publish') publications++; return { code: 0 }; },
-    lookup: async () => ++lookups < 4 ? null : digest,
+    lookup: async () => ++lookups < 8 ? null : digest,
   });
   assert.equal(publications, 1);
-  assert.equal(lookups, 4);
+  assert.equal(lookups, 8);
 });
 
-test('an identical pending stage is skipped while the remaining approved packages publish in order', async () => {
+test('an identical pending runtime is skipped while Windows publishes and the SDK stages its exact approved tarball', async () => {
   const entries = releaseEntries();
   const published = new Map();
-  const publications = [];
+  const calls = [];
+  let sdkStaged = false;
   const result = await publishBundle(entries, version, {
     hasToken: true,
     lookup: async entry => published.get(entry.name) ?? null,
-    stageLookup: async entry => entry === entries[0] ? reviewedStage(entry) : null,
+    stageLookup: async entry => entry === entries[0] || (entry === entries[2] && sdkStaged) ? reviewedStage(entry) : null,
     npm: async (command, args) => {
+      assert.equal(command, 'npm');
+      calls.push(args);
       if (args[0] === 'publish') {
-        publications.push(args[1]);
-        const entry = entries.find(item => item.tarball === args[1]);
+        assert.equal(args[1], entries[1].tarball);
+        const entry = entries[1];
         published.set(entry.name, { shasum: digest(entry.data) });
+      } else if (args[0] === 'stage') {
+        assert.deepEqual(args, ['stage', 'publish', entries[2].tarball, '--access', 'public', '--ignore-scripts', '--json', '--registry', registry, '--loglevel', 'error']);
+        sdkStaged = true;
       } else assert.equal(args[0], 'whoami');
       return { code: 0 };
     },
   });
-  assert.deepEqual(publications, entries.slice(1).map(entry => entry.tarball));
+  assert.deepEqual(calls.map(args => args[0]), ['whoami', 'publish', 'stage']);
+  assert.deepEqual(calls.filter(args => args[0] === 'publish').map(args => args[1]), [entries[1].tarball]);
   assert.equal(result.status, 'awaiting-2fa');
-  assert.deepEqual(result.packages.map(entry => entry.status), ['awaiting-2fa', 'published', 'published']);
+  assert.deepEqual(result.packages.map(entry => entry.status), ['awaiting-2fa', 'published', 'awaiting-2fa']);
   assert.equal(result.packages[0].sha256, digest(entries[0].data, 'sha256'));
+  assert.equal(result.packages[2].sha256, digest(entries[2].data, 'sha256'));
+  assert.equal(result.packages[2].stagedBytesMatchApproved, true);
+});
+
+test('both pending runtimes keep the SDK out of public publication and submit only its exact approved tarball to staging', async () => {
+  const entries = releaseEntries();
+  const calls = [];
+  let sdkStaged = false;
+  const result = await publishBundle(entries, version, {
+    hasToken: true,
+    lookup: async () => null,
+    stageLookup: async entry => entry !== entries[2] || sdkStaged ? reviewedStage(entry) : null,
+    npm: async (command, args, options) => {
+      assert.equal(command, 'npm');
+      calls.push(args);
+      if (args[0] === 'whoami') return { code: 0 };
+      assert.deepEqual(args, ['stage', 'publish', entries[2].tarball, '--access', 'public', '--ignore-scripts', '--json', '--registry', registry, '--loglevel', 'error']);
+      assert.equal(options.allowFailure, true);
+      sdkStaged = true;
+      return { code: 0 };
+    },
+  });
+  assert.deepEqual(calls.map(args => args[0]), ['whoami', 'stage']);
+  assert.equal(calls.some(args => args[0] === 'publish' || args.includes('approve')), false);
+  assert.equal(result.status, 'awaiting-2fa');
+  assert.deepEqual(result.packages.map(entry => entry.status), ['awaiting-2fa', 'awaiting-2fa', 'awaiting-2fa']);
+  assert.equal(result.packages[2].sha256, digest(entries[2].data, 'sha256'));
+  assert.equal(result.packages[2].stagedBytesMatchApproved, true);
 });
 
 test('a conflicting pending stage stops the preflight before publishing any missing package', async () => {

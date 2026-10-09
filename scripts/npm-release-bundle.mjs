@@ -257,15 +257,19 @@ export async function publishBundle(entries, version, {
       console.log(`::notice::Staging conferido, aguardando 2FA: ${entry.name}@${version}, ${pending[index].stageId}`);
       resultEntries.push({ ...pending[index], status: 'awaiting-2fa' }); continue;
     }
-    console.log(`Publicando: ${entry.name}@${version}`);
-    let result = await npm('npm', ['publish', entry.tarball, '--access', 'public', '--ignore-scripts', '--registry', registry, '--loglevel', 'error'], { allowFailure: true });
-    if (classifyNpmError(result) === 'stage-required') {
+    const deferSdk = entry.name === packageNames[2] && resultEntries.some(item => item.status === 'awaiting-2fa');
+    console.log(`${deferSdk ? 'Enviando SDK para staging' : 'Publicando'}: ${entry.name}@${version}`);
+    let result = await npm('npm', deferSdk
+      ? ['stage', 'publish', entry.tarball, '--access', 'public', '--ignore-scripts', '--json', '--registry', registry, '--loglevel', 'error']
+      : ['publish', entry.tarball, '--access', 'public', '--ignore-scripts', '--registry', registry, '--loglevel', 'error'], { allowFailure: true });
+    if (!deferSdk && classifyNpmError(result) === 'stage-required') {
       result = await npm('npm', ['stage', 'publish', entry.tarball, '--access', 'public', '--ignore-scripts', '--json', '--registry', registry, '--loglevel', 'error'], { allowFailure: true });
     }
     let dist;
     let staged;
-    for (let attempt = 0; attempt < 3; attempt++) {
-      if (attempt) await pause(attempt * 1000);
+    const confirmationAttempts = result.code === 0 ? 15 : 3;
+    for (let attempt = 0; attempt < confirmationAttempts; attempt++) {
+      if (attempt) await pause(Math.min(attempt * 1000, 10000));
       dist = await lookup(entry, version);
       if (dist) break;
       staged = await stageLookup(entry, version);
@@ -280,6 +284,22 @@ export async function publishBundle(entries, version, {
     resultEntries.push({ name: entry.name, version, status: 'published' });
   }
   return { version, status: resultEntries.some(entry => entry.status === 'awaiting-2fa') ? 'awaiting-2fa' : 'published', packages: resultEntries };
+}
+
+export async function dryRunBundle(entries, version, { npm = run, lookup = registryDist } = {}) {
+  const existing = [];
+  for (const entry of entries) {
+    const dist = await lookup(entry, version);
+    if (dist) assertRegistryMatches(dist, entry.data, entry.name);
+    existing.push(Boolean(dist));
+  }
+  for (const [index, entry] of entries.entries()) {
+    if (existing[index]) {
+      console.log(`Dry run dispensado para versão pública com bytes idênticos: ${entry.name}@${version}`);
+      continue;
+    }
+    await npm('npm', ['publish', entry.tarball, '--dry-run', '--access', 'public', '--ignore-scripts', '--registry', registry, '--loglevel', 'error']);
+  }
 }
 
 async function main() {
@@ -300,7 +320,7 @@ async function main() {
     return result;
   }
   if (mode === '--dry-run') {
-    for (const entry of entries) await run('npm', ['publish', entry.tarball, '--dry-run', '--access', 'public', '--ignore-scripts', '--registry', registry, '--loglevel', 'error']);
+    await dryRunBundle(entries, approved.manifest.version);
     console.log('Dry run dos três pacotes aprovado; nenhuma publicação executada.');
   }
 }
