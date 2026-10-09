@@ -8,12 +8,12 @@ import { spawnSync } from 'node:child_process';
 import { assertApprovedManifest, assertRegistryMatches, publishBundle, safeNpmError } from '../scripts/npm-release-bundle.mjs';
 
 function manifest() {
-  const names = ['@cosmemilton/acbr-node-linux-x64', '@cosmemilton/acbr-node-win32-x64', '@cosmemilton/acbr-node'];
+  const names = ['cosmemilton-acbr-node-linux-x64', 'cosmemilton-acbr-node-win32-x64', 'cosmemilton-acbr-node'];
   return {
     formatVersion: 1, version: '0.1.0', baseUrl: 'https://miltonjunior.dev.br/acbr-node/releases/0.1.0/',
     validationSha256: 'a'.repeat(64), checksumsSha256: 'b'.repeat(64),
     generated: { fileHashes: Object.fromEntries(['generated/acbr/models.ts', 'generated/acbr/index.ts', 'native/generated/AcbrModels.pas'].map(name => [name, 'c'.repeat(64)])) },
-    artifacts: names.map(name => ({ name, file: `${name.slice(1).replace('/', '-')}-0.1.0.tgz`, bytes: 100, sha256: 'd'.repeat(64) })),
+    artifacts: names.map(name => ({ name, file: `${name.replace(/^@/, '').replace('/', '-')}-0.1.0.tgz`, bytes: 100, sha256: 'd'.repeat(64) })),
   };
 }
 

@@ -2,6 +2,12 @@
 
 Validações registradas em 08/10/2026 para a versão **0.1.0**. A publicação npm e sua automação pela branch `release` foram autorizadas pelo usuário em **09/10/2026**. Os artefatos estão preparados; a publicação ainda não foi executada neste registro.
 
+Em 09/10/2026, os nomes npm foram definidos sem escopo, seguindo os pacotes existentes `cosmemilton-ui` e `cosmemilton-report`: `cosmemilton-acbr-node`, `cosmemilton-acbr-node-linux-x64` e `cosmemilton-acbr-node-win32-x64`. Duas gerações consecutivas produziram os mesmos arquivos; somente o import do cliente gerado mudou. O contrato, os 204 modelos, o mapper Pascal, o lock e todos os arquivos dos runtimes Linux/Windows permanecem idênticos. Os manifests dos runtimes atualizam somente `generatedFileHashes` para vincular o import novo. Typecheck, bundles JavaScript e 27 testes focados do gerador, supervisor e auditoria passaram com os nomes finais. Nenhum motor foi recompilado.
+
+As validações anteriores de instalação ESM/CommonJS descritas abaixo usaram o namespace `@cosmemilton`. A aceitação dos nomes finais foi concluída em 09/10/2026 com os tarballs auditados, instalados fora do repositório: Linux com Node 22.12.0/24.15.0 e Windows nativo com Node 22.12.0/24.18.0, em ESM e CommonJS. Cada execução processou quatro documentos sintéticos (dois emitentes × modelos 55/65), com geração, assinatura e validação: 96 operações reais ao todo. O runtime foi resolvido pelo pacote instalado, sem compilador no PATH. Relatórios e hashes constam em `release/0.1.0/VALIDATION.json`; evidências locais em `.acbr/unscoped-consumer-evidence/`.
+
+A verificação completa com os nomes finais aprovou o typecheck e 38 testes, com quatro suítes nativas opt-in ignoradas; os motores mantêm a evidência anterior de 52 testes Linux e 52 Windows e os mesmos hashes. Auditoria e dry run dos três tarballs aprovados. Os exemplos públicos da documentação também foram conferidos: JavaScript gerou XML sintético usando o pacote instalado e TypeScript passou em modo estrito NodeNext. Nenhuma transmissão à SEFAZ foi realizada.
+
 O snapshot principal usa ACBr SVN **48590** e **204 tipos gerados**. O contrato é:
 
 ```text

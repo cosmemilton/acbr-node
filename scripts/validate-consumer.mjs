@@ -25,7 +25,7 @@ const mainPack=JSON.parse(await run('npm',['pack','--json','--pack-destination',
 const runtimePack=JSON.parse(await run('npm',['pack','--json','--pack-destination',artifacts],path.join(root,'packages/acbr-node-linux-x64'),{capture:true}))[0];
 await mkdir(consumer,{recursive:true});await writeFile(path.join(consumer,'package.json'),JSON.stringify({name:'acbr-node-external-consumer',version:'1.0.0',private:true,type:'module'})+'\n');
 await run('npm',['install','--offline','--ignore-scripts','--no-audit','--no-fund','--omit=optional',path.join(artifacts,mainPack.filename),path.join(artifacts,runtimePack.filename)],consumer);
-const cli=path.join(consumer,'node_modules/@cosmemilton/acbr-node/dist/cli.js');
+const cli=path.join(consumer,'node_modules/cosmemilton-acbr-node/dist/cli.js');
 for(const command of [['init','--revision',String(revision)],['source','update','--revision',String(revision)],['generate'],['build'],['check'],['doctor']])await run('node',[cli,...command],consumer);
 const {CNPJ,objetoDocumento}=await import(path.join(root,'test/native-fixtures.mjs'));
 await writeFile(path.join(consumer,'fixture.json'),JSON.stringify({cnpj:CNPJ,documento:objetoDocumento(55)})+'\n');
@@ -34,9 +34,9 @@ import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 import { homedir } from 'node:os';
 import {criarEmissor,ACBR_CONTRACT} from './generated/acbr/index.js';
-import {criarEmissor as criarPublicado} from '@cosmemilton/acbr-node';
+import {criarEmissor as criarPublicado} from 'cosmemilton-acbr-node';
 import {createRequire} from 'node:module';
-assert.equal(typeof criarPublicado,'function');assert.equal(typeof createRequire(import.meta.url)('@cosmemilton/acbr-node').criarEmissor,'function');
+assert.equal(typeof criarPublicado,'function');assert.equal(typeof createRequire(import.meta.url)('cosmemilton-acbr-node').criarEmissor,'function');
 const fixture=JSON.parse(await readFile('fixture.json','utf8'));
 assert.equal(ACBR_CONTRACT.sourceRevision,${revision});
 const options={cnpj:fixture.cnpj,uf:'CE',modelo:55 as const,ambiente:2 as const};
@@ -45,7 +45,7 @@ const generated=await local.gerarXml(fixture.documento);
 assert.equal(generated.estado,'XML_GERADO');assert.equal(generated.sourceRevision,${revision});assert.equal(generated.envioIniciado,false);
 assert.match(Buffer.from(generated.xmlBase64!,'base64').toString('utf8'),/<NFe/);
 const packaged=criarEmissor(options);
-const packagedManifest=JSON.parse(await readFile('node_modules/@cosmemilton/acbr-node-linux-x64/runtime/manifest.json','utf8'));
+const packagedManifest=JSON.parse(await readFile('node_modules/cosmemilton-acbr-node-linux-x64/runtime/manifest.json','utf8'));
 if(packagedManifest.sourceRevision!==ACBR_CONTRACT.sourceRevision||packagedManifest.contractHash!==ACBR_CONTRACT.contractHash){
  await assert.rejects(packaged.gerarXml(fixture.documento),error=>typeof error==='object'&&error!==null&&'codigo' in error&&/CONTRATO/.test(String(error.codigo)));
 }else{assert.equal((await packaged.gerarXml(fixture.documento)).estado,'XML_GERADO');}

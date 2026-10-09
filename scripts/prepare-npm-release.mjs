@@ -18,8 +18,8 @@ if (validation.version !== pkg.version || validation.sourceRevision !== generate
   throw Error('O relatório de testes não corresponde à versão/contrato. Valide a release antes de fixar os hashes.');
 }
 const artifacts = [];
-for (const name of ['@cosmemilton/acbr-node-linux-x64', '@cosmemilton/acbr-node-win32-x64', pkg.name]) {
-  const file = `${name.slice(1).replace('/', '-')}-${pkg.version}.tgz`;
+for (const name of ['cosmemilton-acbr-node-linux-x64', 'cosmemilton-acbr-node-win32-x64', pkg.name]) {
+  const file = `${name.replace(/^@/, '').replace('/', '-')}-${pkg.version}.tgz`;
   artifacts.push({ name, file, bytes: (await readFile(path.join(artifactDirectory, file))).length, sha256: await sha256(path.join(artifactDirectory, file)) });
 }
 validation.publication = 'authorized';

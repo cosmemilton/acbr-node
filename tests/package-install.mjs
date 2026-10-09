@@ -53,8 +53,8 @@ const path=require('node:path');
 const cp=require('node:child_process');
 (async()=>{
  const kind=process.argv[2];
- const sdk=kind==='esm'?await import('@cosmemilton/acbr-node'):require('@cosmemilton/acbr-node');
- const nativeName='@cosmemilton/acbr-node-'+process.platform+'-x64';
+ const sdk=kind==='esm'?await import('cosmemilton-acbr-node'):require('cosmemilton-acbr-node');
+ const nativeName='cosmemilton-acbr-node-'+process.platform+'-x64';
  const runtime=path.join(path.dirname(require.resolve(nativeName+'/package.json')),'runtime');
  const worker=path.join(runtime,process.platform==='win32'?'acbr-worker.exe':'acbr-worker');
  const nodeBin=path.dirname(process.execPath);

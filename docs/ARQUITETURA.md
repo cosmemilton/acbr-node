@@ -12,4 +12,4 @@ Não há FFI nem addon vinculado a uma versão específica do ABI do Node. As du
 
 O código do Integrador existente não foi alterado ou incorporado como dependência. Regras comerciais, persistência, impostos e orquestração do documento continuam no aplicativo consumidor.
 
-Uma release principal contém ESM, CommonJS, declarações, fontes do extractor/motor, lock e documentos. Os pacotes `@cosmemilton/acbr-node-linux-x64` e `@cosmemilton/acbr-node-win32-x64` incluem runtime, fontes fiscais correspondentes, licenças e instruções de reconstrução. Gerar uma revisão própria exige SVN, Free Pascal e Lazarus gratuitos; consumir a release pronta exige apenas Node e a plataforma suportada.
+Uma release principal contém ESM, CommonJS, declarações, fontes do extractor/motor, lock e documentos. Os pacotes `cosmemilton-acbr-node-linux-x64` e `cosmemilton-acbr-node-win32-x64` incluem runtime, fontes fiscais correspondentes, licenças e instruções de reconstrução. Gerar uma revisão própria exige SVN, Free Pascal e Lazarus gratuitos; consumir a release pronta exige apenas Node e a plataforma suportada.

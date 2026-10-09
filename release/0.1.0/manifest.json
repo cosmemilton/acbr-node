@@ -17,30 +17,30 @@
     ],
     "fileHashes": {
       "generated/acbr/models.ts": "b1b6e1e181d0d34ace613ef3758c3a81627cea9e1854a0603173a2c7b1c52a14",
-      "generated/acbr/index.ts": "4f305cad0d7b340df94e8982c2f09d779cc7d3a28dc7b108501d29d3042c5b60",
+      "generated/acbr/index.ts": "baa7c0df37f3813ba4c790f10914b127edab8e7d67ce947d126f70a070e75739",
       "native/generated/AcbrModels.pas": "5f6f5d66056bba38fe8892d79d5a8678cc4ac676f1a9f0b5f69f0fcf6458aa84"
     }
   },
   "artifacts": [
     {
-      "name": "@cosmemilton/acbr-node-linux-x64",
+      "name": "cosmemilton-acbr-node-linux-x64",
       "file": "cosmemilton-acbr-node-linux-x64-0.1.0.tgz",
-      "bytes": 51569712,
-      "sha256": "efa796aad7e8bf9b7f9f14c4da28f74f495be3dd9bb8c14330a3955a95ffef69"
+      "bytes": 51569711,
+      "sha256": "2523e1200f26c6a547781264c404c99b75540bb027af07a908fd4f3c43c054a8"
     },
     {
-      "name": "@cosmemilton/acbr-node-win32-x64",
+      "name": "cosmemilton-acbr-node-win32-x64",
       "file": "cosmemilton-acbr-node-win32-x64-0.1.0.tgz",
-      "bytes": 33668389,
-      "sha256": "b1b41ccd90dc50d9697149450965c16b4a72f4f134c0bb634ddfae6262ae8e1b"
+      "bytes": 33668399,
+      "sha256": "ba406b8700e7eb6bab0923ed203b19c529f2d2d1dba8400573aafc8388ca0849"
     },
     {
-      "name": "@cosmemilton/acbr-node",
+      "name": "cosmemilton-acbr-node",
       "file": "cosmemilton-acbr-node-0.1.0.tgz",
-      "bytes": 519887,
-      "sha256": "81170222812ee5434c9f596dae00c85c4cc823237d1a2860d2af2e5f87ae4c1d"
+      "bytes": 520147,
+      "sha256": "a0b9c938cad6d2d11570e748ae6c569d39a58312412b7963f3c477a63824e363"
     }
   ],
-  "validationSha256": "464abaa2115bb86802a760f6180f694b6ee63e1327d988aec6ce98356625d4f6",
-  "checksumsSha256": "98bbbbeab31f62875ec64bfc28a6a7e9bd36db09dff15e216b0df4def918ecfa"
+  "validationSha256": "d3c578ae28a2d1e2479d3e67566952e10cdb61200d22f8f96f1f34be1a0aa0a7",
+  "checksumsSha256": "8b5a652ea567acf9f53583f8fdbfd4308d2fcd5d435fc9ef7908f220992d0b61"
 }

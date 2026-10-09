@@ -29,7 +29,7 @@ async function resolveRuntime(directory: string | undefined, contract: Contrato)
   let root=directory;
   if(!root) {
     if(!['linux','win32'].includes(process.platform) || process.arch!=='x64') throw fail('PLATAFORMA_NAO_SUPORTADA','Esta versão exige Linux ou Windows x64.');
-    try { const require=createRequire(typeof __filename!=='undefined'?__filename:import.meta.url); root=path.join(path.dirname(require.resolve('@cosmemilton/acbr-node-'+process.platform+'-x64/package.json')),'runtime'); }
+    try { const require=createRequire(typeof __filename!=='undefined'?__filename:import.meta.url); root=path.join(path.dirname(require.resolve('cosmemilton-acbr-node-'+process.platform+'-x64/package.json')),'runtime'); }
     catch { throw fail('RUNTIME_AUSENTE','Instale o pacote de runtime da plataforma ou informe runtimeDirectory.'); }
   }
   root=path.resolve(root);

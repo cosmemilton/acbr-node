@@ -1,5 +1,5 @@
 // Generated client bound to its own ACBr contract. Do not edit.
-import { criarEmissor as criarRuntime, type OpcoesEmissor, type OpcoesOperacao } from "@cosmemilton/acbr-node/runtime";
+import { criarEmissor as criarRuntime, type OpcoesEmissor, type OpcoesOperacao } from "cosmemilton-acbr-node/runtime";
 import { ACBR_CONTRACT, validateTNFe, type TNFeInput } from "./models.js";
 export * from "./models.js";
 export function criarEmissor(options: Omit<OpcoesEmissor, "contrato" | "validaDocumento">) {

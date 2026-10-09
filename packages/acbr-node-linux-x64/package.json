@@ -1,8 +1,8 @@
 {
-  "name": "@cosmemilton/acbr-node-linux-x64",
+  "name": "cosmemilton-acbr-node-linux-x64",
   "version": "0.1.0",
   "license": "LGPL-2.1-or-later",
-  "description": "Motor ACBr linux x64 para @cosmemilton/acbr-node",
+  "description": "Motor ACBr linux x64 para cosmemilton-acbr-node",
   "os": [
     "linux"
   ],

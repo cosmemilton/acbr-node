@@ -1,6 +1,6 @@
-# @cosmemilton/acbr-node-linux-x64
+# cosmemilton-acbr-node-linux-x64
 
-Runtime fiscal Free Pascal/ACBr para [@cosmemilton/acbr-node](https://www.npmjs.com/package/@cosmemilton/acbr-node), instalado automaticamente pelo pacote principal na plataforma Linux x64 Ubuntu 24.04/glibc.
+Runtime fiscal Free Pascal/ACBr para [cosmemilton-acbr-node](https://www.npmjs.com/package/cosmemilton-acbr-node), instalado automaticamente pelo pacote principal na plataforma Linux x64 Ubuntu 24.04/glibc.
 
 [Documentação e exemplos](https://miltonjunior.dev.br/acbr-node/) · [Código e problemas](https://github.com/cosmemilton/acbr-node)
 

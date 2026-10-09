@@ -8,7 +8,7 @@ import { auditRuntime, auditMainInventory, GENERATED_FILES, assertGeneratedHashe
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const registry = 'https://registry.npmjs.org';
-const packageNames = ['@cosmemilton/acbr-node-linux-x64', '@cosmemilton/acbr-node-win32-x64', '@cosmemilton/acbr-node'];
+const packageNames = ['cosmemilton-acbr-node-linux-x64', 'cosmemilton-acbr-node-win32-x64', 'cosmemilton-acbr-node'];
 const versionPattern = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 const hashPattern = /^[a-f0-9]{64}$/;
 const repository = 'git+https://github.com/cosmemilton/acbr-node.git';
@@ -21,7 +21,7 @@ export function assertApprovedManifest(manifest) {
   assertGeneratedHashes(manifest.generated?.fileHashes);
   for (const [index, name] of packageNames.entries()) {
     const entry = manifest.artifacts[index];
-    if (entry.name !== name || entry.file !== `${name.slice(1).replace('/', '-')}-${manifest.version}.tgz` ||
+    if (entry.name !== name || entry.file !== `${name.replace(/^@/, '').replace('/', '-')}-${manifest.version}.tgz` ||
         !hashPattern.test(entry.sha256) || !Number.isSafeInteger(entry.bytes) || entry.bytes <= 0 || entry.bytes > 200 * 1024 * 1024) throw Error('Identidade/hash de tarball inválido.');
   }
   if (!hashPattern.test(manifest.validationSha256) || !hashPattern.test(manifest.checksumsSha256)) throw Error('Hashes de validação ausentes.');
@@ -55,10 +55,10 @@ export function safeNpmError(result) {
   const detail = code ? `, ${code}` : '';
   const errorCategory = result.errorCategory ?? classifyNpmError(result);
   const hints = {
-    'scope-not-found': 'Confira se a conta npm autenticada possui o escopo @cosmemilton.',
-    'access-denied': 'Confira se o NPM_TOKEN permite criar e publicar os três pacotes no escopo @cosmemilton.',
+    'scope-not-found': 'Confira se o nome do pacote pertence à conta npm autenticada.',
+    'access-denied': 'Confira se o NPM_TOKEN permite criar e publicar os três pacotes cosmemilton-acbr-node.',
     'two-factor-required': 'Confira a política de 2FA e a permissão de publicação automatizada do NPM_TOKEN.',
-    'check-scope-and-token': 'Confira a conta autenticada, o escopo @cosmemilton e as permissões de criação/publicação do NPM_TOKEN.',
+    'check-scope-and-token': 'Confira a conta autenticada, os nomes npm e as permissões de criação/publicação do NPM_TOKEN.',
   };
   const guidance = hints[errorCategory] ?? (['EOTP', 'E401', 'E403', 'ENEEDAUTH'].includes(code)
     ? 'Confira o secret NPM_TOKEN, as permissões dos três pacotes e a política de 2FA no npm.' : '');
@@ -153,7 +153,7 @@ export async function validateBundle(directory, approved = undefined) {
       await run('python3', [path.join(root, 'scripts/unpack-npm-tarball.py'), path.join(directory, entry.file), target]);
       const packageDirectory = path.join(target, 'package');
       const pkg = JSON.parse(await readFile(path.join(packageDirectory, 'package.json'), 'utf8'));
-      const workspacePackage = JSON.parse(await readFile(path.join(root, entry.name === packageNames[2] ? 'package.json' : `packages/${entry.name.split('/')[1]}/package.json`), 'utf8'));
+      const workspacePackage = JSON.parse(await readFile(path.join(root, entry.name === packageNames[2] ? 'package.json' : `packages/${entry.name.replace(/^cosmemilton-/, '')}/package.json`), 'utf8'));
       if (pkg.name !== entry.name || pkg.version !== manifest.version || pkg.license !== 'LGPL-2.1-or-later' ||
           pkg.publishConfig?.access !== 'public' || pkg.repository?.url !== repository || pkg.homepage !== homepage ||
           JSON.stringify(pkg) !== JSON.stringify(workspacePackage) || pkg.scripts?.prepublishOnly || pkg.scripts?.publish || pkg.scripts?.postpublish) throw Error(`Metadados npm incompatíveis: ${entry.name}`);

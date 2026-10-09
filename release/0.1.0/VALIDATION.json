@@ -17,47 +17,6 @@
     "windowsNative": {
       "passed": 52
     },
-    "installedLinux": {
-      "node": [
-        "22.12.0",
-        "24.15.0"
-      ],
-      "formats": [
-        "esm",
-        "commonjs"
-      ],
-      "emitters": 2,
-      "models": [
-        55,
-        65
-      ],
-      "operations": [
-        "gerarXml",
-        "assinar",
-        "validar"
-      ],
-      "compilerPathAbsent": true
-    },
-    "installedWindows": {
-      "node": [
-        "22.12.0"
-      ],
-      "formats": [
-        "esm",
-        "commonjs"
-      ],
-      "emitters": 2,
-      "models": [
-        55,
-        65
-      ],
-      "operations": [
-        "gerarXml",
-        "assinar",
-        "validar"
-      ],
-      "compilerPathAbsent": true
-    },
     "customConsumerRevision": 48589,
     "cliOffline": {
       "platforms": [
@@ -85,6 +44,170 @@
       "unsafeTarExtractionRefused": true,
       "sanitizedNpmDiagnostics": true,
       "delayedRegistryConfirmationWithoutRepublish": true
+    },
+    "previousNamespaceInstalledLinux": {
+      "node": [
+        "22.12.0",
+        "24.15.0"
+      ],
+      "formats": [
+        "esm",
+        "commonjs"
+      ],
+      "emitters": 2,
+      "models": [
+        55,
+        65
+      ],
+      "operations": [
+        "gerarXml",
+        "assinar",
+        "validar"
+      ],
+      "compilerPathAbsent": true,
+      "testedPackage": "@cosmemilton/acbr-node"
+    },
+    "previousNamespaceInstalledWindows": {
+      "node": [
+        "22.12.0"
+      ],
+      "formats": [
+        "esm",
+        "commonjs"
+      ],
+      "emitters": 2,
+      "models": [
+        55,
+        65
+      ],
+      "operations": [
+        "gerarXml",
+        "assinar",
+        "validar"
+      ],
+      "compilerPathAbsent": true,
+      "testedPackage": "@cosmemilton/acbr-node"
+    },
+    "namespaceMigrationTests": {
+      "testedPackage": "cosmemilton-acbr-node",
+      "passed": 27,
+      "generator": 6,
+      "runtimeSupervisor": 8,
+      "releaseAudit": 7,
+      "releaseAutomation": 6,
+      "typescript": "passed",
+      "javascriptBundles": "rebuilt",
+      "engines": "not-rebuilt"
+    },
+    "currentNamespaceInstalledLinux": {
+      "status": "passed",
+      "testedPackage": "cosmemilton-acbr-node",
+      "nodeVersions": [
+        "22.12.0",
+        "24.15.0"
+      ],
+      "formats": [
+        "esm",
+        "commonjs"
+      ],
+      "syntheticEmitters": 2,
+      "models": [
+        55,
+        65
+      ],
+      "operations": [
+        "gerarXml",
+        "assinar",
+        "validar"
+      ],
+      "fixturesPerRun": 4,
+      "workerExecutionsPerRun": 12,
+      "totalWorkerExecutions": 48,
+      "nativeExecution": true,
+      "compilerPathAbsent": true,
+      "sourceCheckoutUnused": true,
+      "reports": [
+        {
+          "file": ".acbr/unscoped-consumer-evidence/linux-node22-esm.json",
+          "sha256": "c8f028f5355e955f0ec6f4417c413cd036ce88afe9df7d3195861cc5a2a1d20d"
+        },
+        {
+          "file": ".acbr/unscoped-consumer-evidence/linux-node22-cjs.json",
+          "sha256": "1d2becceca4bc868ab7e1d62b22c6798dcd62e89bca62955d1f10e6ea7279063"
+        },
+        {
+          "file": ".acbr/unscoped-consumer-evidence/linux-node24-esm.json",
+          "sha256": "6164613af28885f2efe68492a3b1727a1a8f375a400dcdd62608a3fd8592dc3d"
+        },
+        {
+          "file": ".acbr/unscoped-consumer-evidence/linux-node24-cjs.json",
+          "sha256": "f5bfe07642e2c28f03cdc1d08fe6a08eef876f06f090652052ff40460babcd10"
+        }
+      ]
+    },
+    "currentNamespaceInstalledWindows": {
+      "status": "passed",
+      "testedPackage": "cosmemilton-acbr-node",
+      "nodeVersions": [
+        "22.12.0",
+        "24.18.0"
+      ],
+      "formats": [
+        "esm",
+        "commonjs"
+      ],
+      "syntheticEmitters": 2,
+      "models": [
+        55,
+        65
+      ],
+      "operations": [
+        "gerarXml",
+        "assinar",
+        "validar"
+      ],
+      "fixturesPerRun": 4,
+      "workerExecutionsPerRun": 12,
+      "totalWorkerExecutions": 48,
+      "nativeExecution": true,
+      "compilerPathAbsent": true,
+      "sourceCheckoutUnused": true,
+      "reports": [
+        {
+          "file": ".acbr/unscoped-consumer-evidence/windows-node22-esm.json",
+          "sha256": "ac94f6f0f958a78a0816ac21586920e22595fe29d3d0b197f2e3ae699b56066f"
+        },
+        {
+          "file": ".acbr/unscoped-consumer-evidence/windows-node22-cjs.json",
+          "sha256": "3e7daa381dad23b32709be5c93c581cd67e78756bea36c9979d47c4b60dcd281"
+        },
+        {
+          "file": ".acbr/unscoped-consumer-evidence/windows-node24-esm.json",
+          "sha256": "59d408efb5622233a849a6a93b523dddf05736fa85cae10386986a62a480f233"
+        },
+        {
+          "file": ".acbr/unscoped-consumer-evidence/windows-node24-cjs.json",
+          "sha256": "edd6e5e34ea9e68a90bd5bc94f23f06905e3d5cde283b9c33a361a6b3514399b"
+        }
+      ]
+    },
+    "currentNamespaceFullSuite": {
+      "typescript": "passed",
+      "passed": 38,
+      "skippedNativeOptIn": 4,
+      "bundleAudit": "passed",
+      "npmPublishDryRun": "passed"
+    },
+    "publicDocumentationExamples": {
+      "javascriptOfflineGeneration": "passed",
+      "typescriptStrictNodeNext": "passed",
+      "testedPackage": "cosmemilton-acbr-node",
+      "node": "24.15.0",
+      "hashes": {
+        "primeiro-xml.mjs": "366efe4dd1b0218ffaaab52d42f529e0678843fb64e17a98619260c55dc62279",
+        "primeiro-xml.ts": "f0c4c560c7bf0c7ebd53698405d4576a1e94132dfedf4d988d84ccc39c2d7a4e"
+      },
+      "sefazTransmission": false
     }
   },
   "limitations": [
@@ -95,19 +218,150 @@
   "artifacts": [
     {
       "file": "cosmemilton-acbr-node-linux-x64-0.1.0.tgz",
-      "bytes": 51569712,
-      "sha256": "efa796aad7e8bf9b7f9f14c4da28f74f495be3dd9bb8c14330a3955a95ffef69"
+      "bytes": 51569711,
+      "sha256": "2523e1200f26c6a547781264c404c99b75540bb027af07a908fd4f3c43c054a8"
     },
     {
       "file": "cosmemilton-acbr-node-win32-x64-0.1.0.tgz",
-      "bytes": 33668389,
-      "sha256": "b1b41ccd90dc50d9697149450965c16b4a72f4f134c0bb634ddfae6262ae8e1b"
+      "bytes": 33668399,
+      "sha256": "ba406b8700e7eb6bab0923ed203b19c529f2d2d1dba8400573aafc8388ca0849"
     },
     {
       "file": "cosmemilton-acbr-node-0.1.0.tgz",
-      "bytes": 519887,
-      "sha256": "81170222812ee5434c9f596dae00c85c4cc823237d1a2860d2af2e5f87ae4c1d"
+      "bytes": 520147,
+      "sha256": "a0b9c938cad6d2d11570e748ae6c569d39a58312412b7963f3c477a63824e363"
     }
   ],
-  "publicationAuthorizedOn": "2026-10-09"
+  "publicationAuthorizedOn": "2026-10-09",
+  "namespaceMigration": {
+    "from": "@miltoncosme/acbr-node",
+    "to": "cosmemilton-acbr-node",
+    "finalNames": [
+      "cosmemilton-acbr-node",
+      "cosmemilton-acbr-node-linux-x64",
+      "cosmemilton-acbr-node-win32-x64"
+    ],
+    "scope": "unscoped",
+    "sourceRevision": 48590,
+    "contractHash": "e5a497cefe8e0e350a30da5cc04e88b35c38a98535893d52f878890260d1346d",
+    "generatedModels": 204,
+    "lockSha256Unchanged": true,
+    "deterministicSecondGeneration": true,
+    "modelAndPascalHashesUnchanged": true,
+    "generatedIndexBefore": "0bcc03f50136dd0de82d4151bd410c5d85115021af57122c55fad19224075dfe",
+    "generatedIndexAfter": "baa7c0df37f3813ba4c790f10914b127edab8e7d67ce947d126f70a070e75739",
+    "allRuntimeFilesUnchanged": true,
+    "engines": {
+      ".acbr/runtime/linux-x64": {
+        "executable": "acbr-worker",
+        "sha256": "5cf11071f8b06e5ee05dd9ef114a9b7f7060949e5a0836728390b4ae4a67db68"
+      },
+      ".acbr/runtime/win32-x64": {
+        "executable": "acbr-worker.exe",
+        "sha256": "48d104bf06776f4f8e8c68257f9b7b29ad84dd3df8a48d8776a66d78e5b18bce"
+      },
+      "packages/acbr-node-linux-x64/runtime": {
+        "executable": "acbr-worker",
+        "sha256": "5cf11071f8b06e5ee05dd9ef114a9b7f7060949e5a0836728390b4ae4a67db68"
+      },
+      "packages/acbr-node-win32-x64/runtime": {
+        "executable": "acbr-worker.exe",
+        "sha256": "48d104bf06776f4f8e8c68257f9b7b29ad84dd3df8a48d8776a66d78e5b18bce"
+      }
+    },
+    "currentNamespaceConsumerAcceptance": {
+      "linux": {
+        "status": "passed",
+        "testedPackage": "cosmemilton-acbr-node",
+        "nodeVersions": [
+          "22.12.0",
+          "24.15.0"
+        ],
+        "formats": [
+          "esm",
+          "commonjs"
+        ],
+        "syntheticEmitters": 2,
+        "models": [
+          55,
+          65
+        ],
+        "operations": [
+          "gerarXml",
+          "assinar",
+          "validar"
+        ],
+        "fixturesPerRun": 4,
+        "workerExecutionsPerRun": 12,
+        "totalWorkerExecutions": 48,
+        "nativeExecution": true,
+        "compilerPathAbsent": true,
+        "sourceCheckoutUnused": true,
+        "reports": [
+          {
+            "file": ".acbr/unscoped-consumer-evidence/linux-node22-esm.json",
+            "sha256": "c8f028f5355e955f0ec6f4417c413cd036ce88afe9df7d3195861cc5a2a1d20d"
+          },
+          {
+            "file": ".acbr/unscoped-consumer-evidence/linux-node22-cjs.json",
+            "sha256": "1d2becceca4bc868ab7e1d62b22c6798dcd62e89bca62955d1f10e6ea7279063"
+          },
+          {
+            "file": ".acbr/unscoped-consumer-evidence/linux-node24-esm.json",
+            "sha256": "6164613af28885f2efe68492a3b1727a1a8f375a400dcdd62608a3fd8592dc3d"
+          },
+          {
+            "file": ".acbr/unscoped-consumer-evidence/linux-node24-cjs.json",
+            "sha256": "f5bfe07642e2c28f03cdc1d08fe6a08eef876f06f090652052ff40460babcd10"
+          }
+        ]
+      },
+      "windows": {
+        "status": "passed",
+        "testedPackage": "cosmemilton-acbr-node",
+        "nodeVersions": [
+          "22.12.0",
+          "24.18.0"
+        ],
+        "formats": [
+          "esm",
+          "commonjs"
+        ],
+        "syntheticEmitters": 2,
+        "models": [
+          55,
+          65
+        ],
+        "operations": [
+          "gerarXml",
+          "assinar",
+          "validar"
+        ],
+        "fixturesPerRun": 4,
+        "workerExecutionsPerRun": 12,
+        "totalWorkerExecutions": 48,
+        "nativeExecution": true,
+        "compilerPathAbsent": true,
+        "sourceCheckoutUnused": true,
+        "reports": [
+          {
+            "file": ".acbr/unscoped-consumer-evidence/windows-node22-esm.json",
+            "sha256": "ac94f6f0f958a78a0816ac21586920e22595fe29d3d0b197f2e3ae699b56066f"
+          },
+          {
+            "file": ".acbr/unscoped-consumer-evidence/windows-node22-cjs.json",
+            "sha256": "3e7daa381dad23b32709be5c93c581cd67e78756bea36c9979d47c4b60dcd281"
+          },
+          {
+            "file": ".acbr/unscoped-consumer-evidence/windows-node24-esm.json",
+            "sha256": "59d408efb5622233a849a6a93b523dddf05736fa85cae10386986a62a480f233"
+          },
+          {
+            "file": ".acbr/unscoped-consumer-evidence/windows-node24-cjs.json",
+            "sha256": "edd6e5e34ea9e68a90bd5bc94f23f06905e3d5cde283b9c33a361a6b3514399b"
+          }
+        ]
+      }
+    }
+  }
 }
