@@ -428,8 +428,9 @@ test('tarball extraction refuses traversal and symlinks before writing outside p
   for (const [index, [name, kind]] of [['package/../../escaped', 'file'], ['package/link', 'symlink']].entries()) {
     const tarball = path.join(directory, `hostile-${index}.tgz`);
     const code = 'import io,tarfile,sys\nwith tarfile.open(sys.argv[1],"w:gz") as t:\n m=tarfile.TarInfo(sys.argv[2])\n if sys.argv[3]=="symlink": m.type=tarfile.SYMTYPE; m.linkname="../../escaped"\n else: m.size=1\n t.addfile(m,io.BytesIO(b"x") if m.isfile() else None)';
-    assert.equal(spawnSync('python3', ['-c', code, tarball, name, kind]).status, 0);
-    const result = spawnSync('python3', ['scripts/unpack-npm-tarball.py', tarball, path.join(directory, `extract-${index}`)]);
+    const python = process.platform === 'win32' ? 'python' : 'python3';
+    assert.equal(spawnSync(python, ['-c', code, tarball, name, kind], { windowsHide: true }).status, 0);
+    const result = spawnSync(python, ['scripts/unpack-npm-tarball.py', tarball, path.join(directory, `extract-${index}`)], { windowsHide: true });
     assert.notEqual(result.status, 0);
   }
   await assert.rejects(access(path.join(directory, 'escaped')));

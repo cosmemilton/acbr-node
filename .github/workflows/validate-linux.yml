@@ -32,7 +32,8 @@ jobs:
       - run: node dist/cli.js check
       - run: npm test
       - run: node --import tsx scripts/build-test-worker.mjs
-      - run: ACBR_NODE_RUNTIME_DIR="$PWD/.acbr/test-runtime/linux-x64" ACBR_NATIVE_TEST=1 npm run test:native
+      - run: ACBR_NATIVE_TEST=1 node --import tsx --test test/native.test.mjs
+      - run: ACBR_NODE_RUNTIME_DIR="$PWD/.acbr/test-runtime/linux-x64" ACBR_NATIVE_TEST=1 node --import tsx --test test/native-soap.test.mjs test/native-tls.test.mjs
       - run: node scripts/validate-consumer.mjs --revision "$CONSUMER_REVISION"
         env:
           CONSUMER_REVISION: ${{ inputs.consumer_revision }}

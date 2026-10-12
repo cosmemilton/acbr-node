@@ -1,0 +1,247 @@
+{
+  "version": "0.1.1",
+  "publication": "authorized",
+  "sourceRevision": 48590,
+  "sourceHash": "6b768e4f45b4092d040f7576d6fb799d8b66b45ae29a0902c37334fb7c5c6816",
+  "contractHash": "e5a497cefe8e0e350a30da5cc04e88b35c38a98535893d52f878890260d1346d",
+  "generatedModels": 204,
+  "checks": {
+    "typescript": "passed",
+    "javascriptBundles": "rebuilt",
+    "linuxSdk": {
+      "passed": 96,
+      "failed": 0,
+      "skipped": 4,
+      "node": "v24.15.0"
+    },
+    "windowsSdk": {
+      "passed": 94,
+      "failed": 0,
+      "skipped": 6,
+      "node": "v24.18.0"
+    },
+    "linuxNative": {
+      "offlinePassed": 20,
+      "localhostSoapTlsPassed": 32,
+      "failed": 0
+    },
+    "windowsNative": {
+      "offlinePassed": 20,
+      "failed": 0
+    },
+    "generatedClient": {
+      "deterministicFclClosurePassed": true,
+      "sourceRevision": 48590,
+      "models": 204,
+      "contractUnchanged": true,
+      "pascalBytesUnchanged": true
+    },
+    "installedPackage": {
+      "linux": {
+        "formats": [
+          "esm",
+          "cjs"
+        ],
+        "node": "v24.15.0",
+        "fixturesPerFormat": 4,
+        "operationsPerFormat": 12,
+        "models": [
+          55,
+          65
+        ],
+        "emitters": 2,
+        "compilerPathAbsent": true,
+        "sourceCheckoutUnused": true,
+        "networkTransmission": false
+      },
+      "win32": {
+        "formats": [
+          "esm",
+          "cjs"
+        ],
+        "node": "v24.18.0",
+        "fixturesPerFormat": 4,
+        "operationsPerFormat": 12,
+        "models": [
+          55,
+          65
+        ],
+        "emitters": 2,
+        "compilerPathAbsent": true,
+        "sourceCheckoutUnused": true,
+        "networkTransmission": false
+      }
+    },
+    "linuxNpmCliSymlink": "passed",
+    "tarballAudit": "passed",
+    "npmDryRun": "passed",
+    "pullRequestCi": {
+      "status": "passed",
+      "workflow": "Validate SDK pull request",
+      "trigger": "push",
+      "sourceCommit": "d8943eed9f0e38792aedfee313b0084364d32548",
+      "runId": 38247646775,
+      "url": "https://github.com/cosmemilton/acbr-node/actions/runs/38247646775",
+      "jobs": [
+        {
+          "name": "ubuntu-24.04 / Node 22.12.0",
+          "passed": 95,
+          "failed": 0,
+          "skipped": 5
+        },
+        {
+          "name": "ubuntu-24.04 / Node 24",
+          "passed": 95,
+          "failed": 0,
+          "skipped": 5
+        },
+        {
+          "name": "windows-latest / Node 22.12.0",
+          "passed": 95,
+          "failed": 0,
+          "skipped": 5
+        },
+        {
+          "name": "windows-latest / Node 24",
+          "passed": 95,
+          "failed": 0,
+          "skipped": 5
+        }
+      ]
+    },
+    "minimumNode": "22.12.0: typecheck, build and SDK tests passed on Linux and Windows",
+    "installedDiagnosticsApi": {
+      "windows": {
+        "passed": 62,
+        "failed": 0,
+        "motorSpawns": 0,
+        "node": "v24.18.0"
+      },
+      "linux": {
+        "passed": 62,
+        "failed": 0,
+        "motorSpawns": 0,
+        "node": "v24.15.0"
+      }
+    }
+  },
+  "nativeReuse": {
+    "reusedNativeBytes": true,
+    "formatVersion": 1,
+    "kind": "native-runtime-reuse",
+    "fromVersion": "0.1.0",
+    "toVersion": "0.1.1",
+    "approvedOriginalCommit": "8cb0abf477e58d43eea173df9a72b04676057cf1",
+    "approvedReleaseManifestSha256": "695df3d6a6d8353bed38cd85a5bc2caeecc0b1e708d3eea1b01c802ef3b8d7bb",
+    "sourceRevision": 48590,
+    "sourceHash": "6b768e4f45b4092d040f7576d6fb799d8b66b45ae29a0902c37334fb7c5c6816",
+    "contractHash": "e5a497cefe8e0e350a30da5cc04e88b35c38a98535893d52f878890260d1346d",
+    "generatedFileHashesBefore": {
+      "generated/acbr/models.ts": "b1b6e1e181d0d34ace613ef3758c3a81627cea9e1854a0603173a2c7b1c52a14",
+      "generated/acbr/index.ts": "baa7c0df37f3813ba4c790f10914b127edab8e7d67ce947d126f70a070e75739",
+      "native/generated/AcbrModels.pas": "5f6f5d66056bba38fe8892d79d5a8678cc4ac676f1a9f0b5f69f0fcf6458aa84"
+    },
+    "generatedFileHashesAfter": {
+      "generated/acbr/models.ts": "5efd68ec7d64d57ac7a1bbfe2a6286c459c5cbd3139ab557ddfb9b92b2e485d2",
+      "generated/acbr/index.ts": "4a4971615be81f2c0031d4d2795a4c09551f50910bce649bf773eb8c44f77cdd",
+      "native/generated/AcbrModels.pas": "5f6f5d66056bba38fe8892d79d5a8678cc4ac676f1a9f0b5f69f0fcf6458aa84"
+    },
+    "runtimes": [
+      {
+        "platform": "linux",
+        "arch": "x64",
+        "approvedArtifact": "cosmemilton-acbr-node-linux-x64-0.1.0.tgz",
+        "approvedArtifactBytes": 51569711,
+        "approvedArtifactSha256": "2523e1200f26c6a547781264c404c99b75540bb027af07a908fd4f3c43c054a8",
+        "runtimeFileCount": 251,
+        "nativeSourceCount": 7,
+        "manifestSha256Before": "b2db5cc692e496fc10415fef327267f91df9a7676a3d1c21ab8372417e286d33",
+        "manifestSha256After": "30cc2a9acf9e7882070a0bba33d3ccd0ff2f406b148f4377e480ccce2f415417",
+        "executable": "acbr-worker",
+        "workerBinarySha256": "5cf11071f8b06e5ee05dd9ef114a9b7f7060949e5a0836728390b4ae4a67db68",
+        "buildSha256": "409b1d745f607dbdbb22ddd88df0cefb46c359646dd394ab7a31de2538a09592",
+        "correspondingAcbrSourceSha256": "a8c8ccca03865aab1e6da48df540b32a3926c93e48978a85aaf4a33c90cb7eb1",
+        "windowsProvenanceSha256": null,
+        "runtimeFilesSha256": "818a9efa99e124884db7bd65e193b6e45052da377dad138e78f2547cb40491bc",
+        "generatedFileHashesBefore": {
+          "generated/acbr/models.ts": "b1b6e1e181d0d34ace613ef3758c3a81627cea9e1854a0603173a2c7b1c52a14",
+          "generated/acbr/index.ts": "baa7c0df37f3813ba4c790f10914b127edab8e7d67ce947d126f70a070e75739",
+          "native/generated/AcbrModels.pas": "5f6f5d66056bba38fe8892d79d5a8678cc4ac676f1a9f0b5f69f0fcf6458aa84"
+        },
+        "generatedFileHashesAfter": {
+          "generated/acbr/models.ts": "5efd68ec7d64d57ac7a1bbfe2a6286c459c5cbd3139ab557ddfb9b92b2e485d2",
+          "generated/acbr/index.ts": "4a4971615be81f2c0031d4d2795a4c09551f50910bce649bf773eb8c44f77cdd",
+          "native/generated/AcbrModels.pas": "5f6f5d66056bba38fe8892d79d5a8678cc4ac676f1a9f0b5f69f0fcf6458aa84"
+        },
+        "approvedTarballBytesEqualCache": true,
+        "allRuntimeInventoryAndHashesValid": true,
+        "allNativeSourcesByteIdentical": true,
+        "productionRuntime": true,
+        "originalBuildPreserved": true,
+        "licensesAndProvenanceAudited": true
+      },
+      {
+        "platform": "win32",
+        "arch": "x64",
+        "approvedArtifact": "cosmemilton-acbr-node-win32-x64-0.1.0.tgz",
+        "approvedArtifactBytes": 33668399,
+        "approvedArtifactSha256": "ba406b8700e7eb6bab0923ed203b19c529f2d2d1dba8400573aafc8388ca0849",
+        "runtimeFileCount": 241,
+        "nativeSourceCount": 7,
+        "manifestSha256Before": "2b3fa5e3ee5b0807cfc2b23e39890fa68d16e67bfd5ad9c8214d6f2ae5162d37",
+        "manifestSha256After": "0642792f0588b070e83cfe785355d50f97830ad5177efd9b5da287737baa8f85",
+        "executable": "acbr-worker.exe",
+        "workerBinarySha256": "48d104bf06776f4f8e8c68257f9b7b29ad84dd3df8a48d8776a66d78e5b18bce",
+        "buildSha256": "28f746137e18ba3c815274a5c233b13ddae60d570ef4a9586b7c15ff9087b9a0",
+        "correspondingAcbrSourceSha256": "97b41ac7d5b38473fceda8d899b0ef0e73b28eb703f043b5713fcef9e0129cba",
+        "windowsProvenanceSha256": "b041af86bc7a3c35e029b110c383f063506a4dfb53c1cdc33d26c8b2bda7a4e3",
+        "runtimeFilesSha256": "c0f2afcc4d71804218c340ff3158d14343835ef13a31941397b6901c67047d51",
+        "generatedFileHashesBefore": {
+          "generated/acbr/models.ts": "b1b6e1e181d0d34ace613ef3758c3a81627cea9e1854a0603173a2c7b1c52a14",
+          "generated/acbr/index.ts": "baa7c0df37f3813ba4c790f10914b127edab8e7d67ce947d126f70a070e75739",
+          "native/generated/AcbrModels.pas": "5f6f5d66056bba38fe8892d79d5a8678cc4ac676f1a9f0b5f69f0fcf6458aa84"
+        },
+        "generatedFileHashesAfter": {
+          "generated/acbr/models.ts": "5efd68ec7d64d57ac7a1bbfe2a6286c459c5cbd3139ab557ddfb9b92b2e485d2",
+          "generated/acbr/index.ts": "4a4971615be81f2c0031d4d2795a4c09551f50910bce649bf773eb8c44f77cdd",
+          "native/generated/AcbrModels.pas": "5f6f5d66056bba38fe8892d79d5a8678cc4ac676f1a9f0b5f69f0fcf6458aa84"
+        },
+        "approvedTarballBytesEqualCache": true,
+        "allRuntimeInventoryAndHashesValid": true,
+        "allNativeSourcesByteIdentical": true,
+        "productionRuntime": true,
+        "originalBuildPreserved": true,
+        "licensesAndProvenanceAudited": true
+      }
+    ],
+    "candidateFingerprint": "b0b596bc52110bcb72a8e0e2d51c02f95921ff551cbb1d481ba6e9f44e6fd191",
+    "auditGeneratedCurrentPassed": true,
+    "auditRuntimeCurrentVersionPassed": true,
+    "mutationScope": "Only runtime manifest.generatedFileHashes; binary/build/provenance/files preserved",
+    "completedAt": "2026-10-12T11:54:14.936Z"
+  },
+  "networkTransmission": false,
+  "publicationTransport": {
+    "type": "existing-reviewed-https-bundle",
+    "assetsAvailable": false,
+    "status": "pending-public-assets"
+  },
+  "publicationAuthorizedOn": "2026-10-12",
+  "artifacts": [
+    {
+      "file": "cosmemilton-acbr-node-linux-x64-0.1.1.tgz",
+      "bytes": 51569703,
+      "sha256": "860c0efaf6c58c8af0ace2c3577abf8d5738a0a05399a7376505de51513b1202"
+    },
+    {
+      "file": "cosmemilton-acbr-node-win32-x64-0.1.1.tgz",
+      "bytes": 33668402,
+      "sha256": "25577ba3007871191b7f0cb2f5d1346e1cbac7f7f47b06549df0d9a6784f809d"
+    },
+    {
+      "file": "cosmemilton-acbr-node-0.1.1.tgz",
+      "bytes": 606191,
+      "sha256": "97e7a89603199760e4f635d72e6ce25381298631fbb19614c8e3d76fe2b10862"
+    }
+  ]
+}
