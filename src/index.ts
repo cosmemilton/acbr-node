@@ -1,7 +1,12 @@
 import { criarEmissor as criarRuntime, type OpcoesEmissor, type OpcoesOperacao } from './runtime.js';
 import { ACBR_CONTRACT, validateTNFe, type TNFeInput } from '../generated/acbr/models.js';
+import { ErroValidacaoModelo } from '../generated/acbr/models.js';
+import { diagnosticarErro as diagnosticarErroRuntime } from './diagnostics.js';
 export * from './runtime.js';
 export * from '../generated/acbr/models.js';
+export function diagnosticarErro(erro: unknown) {
+  return erro instanceof ErroValidacaoModelo ? erro.diagnostico : diagnosticarErroRuntime(erro);
+}
 export type OpcoesCriarEmissor = Omit<OpcoesEmissor,'contrato'|'validaDocumento'>;
 export function criarEmissor(options: OpcoesCriarEmissor) {
   const emissor=criarRuntime({...options,contrato:ACBR_CONTRACT,validaDocumento:validateTNFe});

@@ -57,9 +57,12 @@ jobs:
       - run: npm test
       - run: node --import tsx scripts/build-test-worker.mjs acbr.ci.windows.config.json
       - run: |
+          $env:ACBR_NATIVE_TEST = '1'
+          node --import tsx --test test/native.test.mjs
+      - run: |
           $env:ACBR_NODE_RUNTIME_DIR = Join-Path $PWD '.acbr/test-runtime/win32-x64'
           $env:ACBR_NATIVE_TEST = '1'
-          npm run test:native
+          node --import tsx --test test/native-soap.test.mjs test/native-tls.test.mjs
       - run: node scripts/pack-runtimes.mjs
       - run: |
           New-Item -ItemType Directory -Path '.acbr/artifacts' -Force | Out-Null

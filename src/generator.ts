@@ -99,6 +99,72 @@ export function compareContracts(previous:ModelIR|undefined,current:ModelIR){
  return {additions:additions.sort(),removals:removals.sort(),changes:changes.sort(),breaking:removals.length>0||changes.length>0};
 }
 const tsType=(p:ModelProperty):string=>p.kind==='object'?p.ref+'Input':p.kind==='list'?p.ref+'Input':p.kind==='enum'?p.ref!:p.kind==='integer'?'number':p.kind==='boolean'?'boolean':'string';
+export function renderModelValidation():string { return String.raw`
+export type CodigoValidacaoModelo = 'MODELO_DESCONHECIDO'|'ENUM_INVALIDO'|'ARRAY_ESPERADO'|'OBJETO_ESPERADO'|'CAMPO_DESCONHECIDO'|'CAMPO_SOMENTE_LEITURA'|'INTEIRO_INVALIDO'|'BOOLEANO_ESPERADO'|'DECIMAL_INVALIDO'|'DATA_HORA_INVALIDA'|'DATA_INVALIDA'|'TEXTO_ESPERADO';
+function campoConhecido(at: unknown): string | undefined {
+ if(typeof at!=='string'||at.length>512||! /^[A-Za-z_]\w*(?:(?:\.[A-Za-z_]\w*)|(?:\[\d{1,7}\]))*$/.test(at))return undefined;
+ const parts=at.replace(/\[(\d+)\]/g,'.$1').split('.');let schema=Object.hasOwn(MODEL_SCHEMA,parts[0])?MODEL_SCHEMA[parts[0]]:undefined;
+ if(!schema)return undefined;
+ for(const part of parts.slice(1)){
+  if(schema.kind==='list'){if(! /^\d+$/.test(part))return undefined;schema=MODEL_SCHEMA[schema.item];}
+  else if(schema.kind==='object'){const p=schema.properties.find((p:any)=>p.name===part);if(!p)return undefined;schema=p.ref?MODEL_SCHEMA[p.ref]:{kind:p.kind};}
+  else return undefined;
+ }
+ return at;
+}
+/** TypeError compatível, com contexto seguro e sem o valor informado ou chaves desconhecidas. */
+export class ErroValidacaoModelo extends TypeError {
+ readonly codigo: CodigoValidacaoModelo;
+ readonly diagnostico: Readonly<{codigo:CodigoValidacaoModelo;etapa:'documento';campo?:string;mensagem:string;acao:string;statusEnvio:'nao_enviado';causa:Readonly<{codigo:CodigoValidacaoModelo;etapa:'documento';campo?:string}>}>;
+ constructor(codigo: CodigoValidacaoModelo, at?: string) {
+  const catalogo:Record<CodigoValidacaoModelo,[string,string]>={
+   MODELO_DESCONHECIDO:['Modelo desconhecido.','Use um modelo exportado pelo cliente gerado.'],
+   ENUM_INVALIDO:['enum inválido','Use um dos valores textuais do enum exportado pelo cliente.'],
+   ARRAY_ESPERADO:['esperado array','Informe uma lista JSON entre colchetes.'],
+   OBJETO_ESPERADO:['esperado objeto','Informe um objeto JSON entre chaves.'],
+   CAMPO_DESCONHECIDO:['propriedade desconhecida','Confira os nomes permitidos neste grupo; a chave desconhecida não é registrada.'],
+   CAMPO_SOMENTE_LEITURA:['propriedade somente leitura','Remova este campo da entrada; o motor preenche seu resultado.'],
+   INTEIRO_INVALIDO:['inteiro fora do intervalo','Informe um número inteiro dentro do intervalo do campo.'],
+   BOOLEANO_ESPERADO:['esperado boolean','Informe true ou false como valor JSON, sem aspas.'],
+   DECIMAL_INVALIDO:['esperado decimal em string','Informe o decimal entre aspas, com ponto e a escala permitida pelo campo.'],
+   DATA_HORA_INVALIDA:['esperado data/hora civil ISO (sem timezone)','Informe a data/hora civil da UF como AAAA-MM-DDTHH:mm:ss, sem Z ou offset. Confira a data antes do envio.'],
+   DATA_INVALIDA:['data inválida','Confira dia, mês, ano e horário usando uma data civil válida.'],
+   TEXTO_ESPERADO:['esperado string','Informe texto entre aspas no JSON.']
+  };
+  const safeCode=Object.hasOwn(catalogo,codigo)?codigo:'MODELO_DESCONHECIDO';
+  const campo=campoConhecido(at),[texto,acao]=catalogo[safeCode],mensagem=(campo?campo+': ':'')+texto;
+  super(mensagem);this.codigo=safeCode;
+  const causa=Object.freeze({codigo:safeCode,etapa:'documento' as const,...(campo?{campo}:{})});
+  this.diagnostico=Object.freeze({codigo:safeCode,etapa:'documento' as const,...(campo?{campo}:{}),mensagem,acao,statusEnvio:'nao_enviado' as const,causa});
+  Object.defineProperty(this,'cause',{value:causa,enumerable:false});
+ }
+ toJSON(){return this.diagnostico;}
+}
+export function validateModel(model: string, value: unknown, at=model): void {
+ const schema=Object.hasOwn(MODEL_SCHEMA,model)?MODEL_SCHEMA[model]:undefined;
+ if(!schema)throw new ErroValidacaoModelo('MODELO_DESCONHECIDO');
+ at=campoConhecido(at)??model;
+ if(schema.kind==='enum'){if(typeof value!=='string'||!schema.values.includes(value))throw new ErroValidacaoModelo('ENUM_INVALIDO',at);return;}
+ if(schema.kind==='list'){if(!Array.isArray(value))throw new ErroValidacaoModelo('ARRAY_ESPERADO',at);value.forEach((item,index)=>validateModel(schema.item,item,at+'['+index+']'));return;}
+ if(value===null||typeof value!=='object'||Array.isArray(value))throw new ErroValidacaoModelo('OBJETO_ESPERADO',at);
+ const fields=new Map<string,any>(schema.properties.filter((p:any)=>!p.readonly).map((p:any)=>[p.name,p]));
+ for(const [name,v] of Object.entries(value)){
+  if(v===undefined)continue;
+  const p=fields.get(name);
+  if(!p){const readonly=schema.properties.some((p:any)=>p.name===name&&p.readonly);throw new ErroValidacaoModelo(readonly?'CAMPO_SOMENTE_LEITURA':'CAMPO_DESCONHECIDO',readonly?at+'.'+name:at);}
+  const field=at+'.'+name;
+  if(p.ref){validateModel(p.ref,v,field);continue;}
+  if(p.kind==='integer'){if(typeof v!=='number'||!Number.isSafeInteger(v)||v<p.min||v>p.max)throw new ErroValidacaoModelo('INTEIRO_INVALIDO',field);}
+  else if(p.kind==='boolean'){if(typeof v!=='boolean')throw new ErroValidacaoModelo('BOOLEANO_ESPERADO',field);}
+  else if(p.kind==='decimal'){if(typeof v!=='string'||v.length>64||! /^-?\d+(?:\.\d+)?$/.test(v)||p.scale!==undefined&&(v.split('.')[1]?.length??0)>p.scale)throw new ErroValidacaoModelo('DECIMAL_INVALIDO',field);}
+  else if(p.kind==='datetime'){
+   if(typeof v!=='string'||! /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?)?$/.test(v)||Number.isNaN(Date.parse(v+(v.length===10?'T00:00:00Z':'Z'))))throw new ErroValidacaoModelo('DATA_HORA_INVALIDA',field);
+   const date=new Date(v+(v.length===10?'T00:00:00Z':'Z'));if(date.toISOString().slice(0,10)!==v.slice(0,10))throw new ErroValidacaoModelo('DATA_INVALIDA',field);
+  }else if(typeof v!=='string')throw new ErroValidacaoModelo('TEXTO_ESPERADO',field);
+ }
+}
+export function validateTNFe(value: unknown): asserts value is TNFeInput { validateModel('TNFe',value); }
+`; }
 export function renderTypeScript(ir:ModelIR,revision:number,contractHash:string):string {
  const out=['// Generated from ACBr AST. LGPL-2.1-or-later. Do not edit.','export const ACBR_CONTRACT = '+stable({sourceRevision:revision,contractHash})+' as const;','export const SOURCE_REVISION=ACBR_CONTRACT.sourceRevision;','export const CONTRACT_HASH=ACBR_CONTRACT.contractHash;'];
  for(const t of ir.types){
@@ -125,30 +191,7 @@ export function renderTypeScript(ir:ModelIR,revision:number,contractHash:string)
   }
  }
  out.push('const MODEL_SCHEMA: Record<string, any> = '+stable(Object.fromEntries(ir.types.map(t=>[t.name,t])))+';');
- out.push(String.raw`
-export function validateModel(model: string, value: unknown, at=model): void {
- const schema=MODEL_SCHEMA[model]; if(!schema)throw new TypeError('Modelo desconhecido: '+model);
- if(schema.kind==='enum'){ if(typeof value!=='string'||!schema.values.includes(value))throw new TypeError(at+': enum inválido'); return; }
- if(schema.kind==='list'){ if(!Array.isArray(value))throw new TypeError(at+': esperado array'); value.forEach((item,index)=>validateModel(schema.item,item,at+'['+index+']'));return; }
- if(value===null||typeof value!=='object'||Array.isArray(value))throw new TypeError(at+': esperado objeto');
- const fields=new Map<string,any>(schema.properties.filter((p:any)=>!p.readonly).map((p:any)=>[p.name,p]));
- for(const [name,v] of Object.entries(value)){
-  if(v===undefined)continue;
-  const p=fields.get(name);if(!p)throw new TypeError(at+'.'+name+': propriedade desconhecida ou somente leitura');
-  if(v===undefined)continue;
-  const field=at+'.'+name;
-  if(p.ref){validateModel(p.ref,v,field);continue;}
-  if(p.kind==='integer'){if(typeof v!=='number'||!Number.isSafeInteger(v)||v<p.min||v>p.max)throw new TypeError(field+': inteiro fora do intervalo');}
-  else if(p.kind==='boolean'){if(typeof v!=='boolean')throw new TypeError(field+': esperado boolean');}
-  else if(p.kind==='decimal'){if(typeof v!=='string'||v.length>64||! /^-?\d+(?:\.\d+)?$/.test(v)||p.scale!==undefined&&(v.split('.')[1]?.length??0)>p.scale)throw new TypeError(field+': esperado decimal em string'+(p.scale!==undefined?' de até '+p.scale+' casas':''));}
-  else if(p.kind==='datetime'){
-   if(typeof v!=='string'||! /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?)?$/.test(v)||Number.isNaN(Date.parse(v+(v.length===10?'T00:00:00Z':'Z'))))throw new TypeError(field+': esperado data/hora civil ISO (sem timezone)');
-   const date=new Date(v+(v.length===10?'T00:00:00Z':'Z'));if(date.toISOString().slice(0,10)!==v.slice(0,10))throw new TypeError(field+': data inválida');
-  }else if(typeof v!=='string')throw new TypeError(field+': esperado string');
- }
-}
-export function validateTNFe(value: unknown): asserts value is TNFeInput { validateModel('TNFe',value); }
-`);
+ out.push(renderModelValidation());
  return out.join('\n')+'\n';
 }
 
@@ -229,9 +272,11 @@ end;
 export function renderClientIndex():string{
  return [
   '// Generated client bound to its own ACBr contract. Do not edit.',
-  'import { criarEmissor as criarRuntime, type OpcoesEmissor, type OpcoesOperacao } from '+JSON.stringify('cosmemilton-acbr-node/runtime')+';',
-  'import { ACBR_CONTRACT, validateTNFe, type TNFeInput } from '+JSON.stringify('./models.js')+';',
+  'import { criarEmissor as criarRuntime, diagnosticarErro as diagnosticarErroRuntime, diagnosticarResultado, type OpcoesEmissor, type OpcoesOperacao } from '+JSON.stringify('cosmemilton-acbr-node/runtime')+';',
+  'import { ACBR_CONTRACT, validateTNFe, ErroValidacaoModelo, type TNFeInput } from '+JSON.stringify('./models.js')+';',
   'export * from '+JSON.stringify('./models.js')+';',
+  'export { diagnosticarResultado };',
+  'export function diagnosticarErro(erro:unknown) { return erro instanceof ErroValidacaoModelo ? erro.diagnostico : diagnosticarErroRuntime(erro); }',
   'export function criarEmissor(options: Omit<OpcoesEmissor, '+JSON.stringify('contrato')+' | '+JSON.stringify('validaDocumento')+'>) {',
   ' const emissor=criarRuntime({...options, contrato:ACBR_CONTRACT, validaDocumento:validateTNFe});',
   ' return {...emissor, gerarXml(documento:TNFeInput, opcoes?:OpcoesOperacao) { return emissor.gerarXml(documento as unknown as Record<string,unknown>, opcoes); }};',

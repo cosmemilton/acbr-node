@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { realpathSync } from 'node:fs';
 import { access } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -97,6 +98,17 @@ export async function main(args = process.argv.slice(2), io: CliIO = process): P
     return 1;
   }
 }
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+function isDirectInvocation(): boolean {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  try {
+    // npm's Unix bin is a symlink; resolve both sides before deciding to run.
+    return realpathSync(resolve(entry)) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    // Importing the CLI must remain inert even if the host's argv path is absent.
+    return false;
+  }
+}
+if (isDirectInvocation()) {
   main().then(code => { process.exitCode = code; });
 }
