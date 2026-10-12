@@ -37,24 +37,40 @@ export function assertRegistryMatches(dist, data, name) {
   }
 }
 
+const npmErrorCodes = new Set(['E_STAGE_REQUIRED', 'EOTP', 'E401', 'E403', 'E404', 'ENEEDAUTH',
+  'EPUBLISHCONFLICT', 'EPRIVATE', 'E400', 'E409', 'E422', 'EUSAGE', 'ENOTSUP', 'ECONNRESET',
+  'ETIMEDOUT', 'EAI_AGAIN', 'ENOTFOUND', 'EJSONPARSE', 'EINVALIDPACKAGENAME', 'EINVALIDTAGNAME', 'EBADENGINE']);
+const npmCategories = new Set(['stage-required', 'scope-not-found', 'access-denied', 'two-factor-required', 'check-scope-and-token']);
+function parseNpmJson(text) {
+  if (typeof text !== 'string' || text.length > 1024 * 1024) return undefined;
+  try { return JSON.parse(text); } catch { return undefined; }
+}
 function npmErrorCode(result) {
-  return /(?:^|\n)npm (?:ERR!|error) code ([A-Z0-9_]+)(?:\r?\n|$)/.exec(result.stderr ?? '')?.[1];
+  const code = /(?:^|\n)npm (?:ERR!|error) code ([A-Z0-9_]+)(?:\r?\n|$)/.exec(result.stderr ?? '')?.[1];
+  if (npmErrorCodes.has(code)) return code;
+  for (const text of [result.stdout, result.stderr]) {
+    const value = parseNpmJson(text)?.error?.code;
+    if (npmErrorCodes.has(value)) return value;
+  }
 }
 
 export function classifyNpmError(result) {
   const stderr = result.stderr ?? '';
-  if (/\bE_STAGE_REQUIRED\b/.test(stderr)) return 'stage-required';
+  const code = npmErrorCode(result);
+  if (code === 'E_STAGE_REQUIRED' || /\bE_STAGE_REQUIRED\b/.test(stderr)) return 'stage-required';
+  if (code === 'EOTP') return 'two-factor-required';
   if (/scope not found/i.test(stderr)) return 'scope-not-found';
+  if (['E401', 'E403', 'ENEEDAUTH'].includes(code)) return 'access-denied';
   if (/(?:permission|not allowed|unauthorized|access denied)/i.test(stderr)) return 'access-denied';
   if (/(?:2fa|two-factor|one-time|otp)/i.test(stderr)) return 'two-factor-required';
-  if (npmErrorCode(result) === 'E404') return 'check-scope-and-token';
+  if (code === 'E404') return 'check-scope-and-token';
   return undefined;
 }
 
 export function safeNpmError(result) {
   const code = npmErrorCode(result);
   const detail = code ? `, ${code}` : '';
-  const errorCategory = result.errorCategory ?? classifyNpmError(result);
+  const errorCategory = npmCategories.has(result.errorCategory) ? result.errorCategory : classifyNpmError(result);
   const hints = {
     'stage-required': 'O npm exige staging e aprovação do mantenedor com 2FA.',
     'scope-not-found': 'Confira se o nome do pacote pertence à conta npm autenticada.',
@@ -64,7 +80,36 @@ export function safeNpmError(result) {
   };
   const guidance = hints[errorCategory] ?? (['EOTP', 'E401', 'E403', 'ENEEDAUTH'].includes(code)
     ? 'Confira o secret NPM_TOKEN, as permissões dos três pacotes e a política de 2FA no npm.' : '');
-  return `exit ${result.code}${detail}${errorCategory ? `, categoria ${errorCategory}` : ''}.${guidance ? ' ' + guidance : ''}`;
+  const exitCode = Number.isInteger(result.code) && result.code >= 0 && result.code <= 255 ? result.code : 'desconhecido';
+  return `exit ${exitCode}${detail}${errorCategory ? `, categoria ${errorCategory}` : ''}.${guidance ? ' ' + guidance : ''}`;
+}
+
+export function safeNpmDiagnostic(result, entry, version) {
+  const json = parseNpmJson(result.stdout);
+  const hasJson = typeof result.stdout === 'string' && result.stdout.length <= 1024 * 1024 && (() => { try { JSON.parse(result.stdout); return true; } catch { return false; } })();
+  const packed = json?.[entry?.name];
+  const diagnostic = {
+    exitCode: Number.isInteger(result.code) && result.code >= 0 && result.code <= 255 ? result.code : null,
+    outputKind: !result.stdout?.trim() ? 'empty' : json?.error ? 'json-error' : packed ? 'tarball-metadata' : hasJson ? 'json' : 'text',
+  };
+  const code = npmErrorCode(result), category = classifyNpmError(result);
+  if (code) diagnostic.errorCode = code;
+  if (category) diagnostic.errorCategory = category;
+  if (packed && entry?.data) {
+    const integrity = `sha512-${createHash('sha512').update(entry.data).digest('base64')}`;
+    const shasum = createHash('sha1').update(entry.data).digest('hex');
+    diagnostic.tarballMetadataMatches = packed.name === entry.name && packed.version === version &&
+      packed.shasum === shasum && packed.integrity === integrity && packed.size === entry.data.length;
+    diagnostic.stageIdPresent = stageIdPattern.test(packed.stageId ?? '');
+  }
+  const stderr = result.stderr ?? '';
+  const hints = [];
+  if (/dry[ -]run/i.test(stderr)) hints.push('dry-run-mentioned');
+  if (/(?:pending|awaiting)[^\r\n]{0,40}(?:review|approval)/i.test(stderr)) hints.push('approval-mentioned');
+  if (/\b(?:2fa|two-factor|one-time|otp)\b/i.test(stderr)) hints.push('two-factor-mentioned');
+  if (/\b(?:staging|stage-required|E_STAGE_REQUIRED)\b/i.test(stderr)) hints.push('staging-mentioned');
+  if (hints.length) diagnostic.noticeHints = hints;
+  return diagnostic;
 }
 
 async function run(command, args, { allowFailure = false, env = process.env, cwd = root } = {}) {
@@ -232,60 +277,183 @@ export async function publishBundle(entries, version, {
   npm = run, lookup = registryDist, hasToken = Boolean(process.env.NODE_AUTH_TOKEN),
   stageLookup = (entry, version) => stagedArtifact(entry, version, { npm }),
   pause = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds)),
+  onProgress = async () => {},
 } = {}) {
-  if (!hasToken) throw Error('NODE_AUTH_TOKEN ausente no passo de publicação.');
-  const authentication = await npm('npm', ['whoami', '--registry', registry, '--loglevel', 'error']);
-  const username = authentication.stdout?.trim();
-  if (username && /^[a-z0-9_-]+$/i.test(username)) console.log(`::notice::Conta npm autenticada: ${username}`);
-  const existing = [];
-  const pending = [];
-  const resultEntries = [];
-  // Detect every published-version conflict before publishing any missing package.
+  const outcomes = entries.map(entry => ({ name: entry.name, version, status: 'not-attempted', registryChecks: 0, stageChecks: 0 }));
+  let phase = 'authentication', currentIndex = -1, diagnostic;
+  const checkpoint = () => onProgress({ version, status: 'in-progress', phase, packages: outcomes });
+  const checkPublic = async index => {
+    const outcome = outcomes[index];
+    outcome.registryChecks++;
+    outcome.lastRegistryCheckAt = new Date().toISOString();
+    const dist = await lookup(entries[index], version);
+    if (dist) assertRegistryMatches(dist, entries[index].data, entries[index].name);
+    outcome.publicVersion = dist ? 'verified' : 'absent';
+    if (dist) outcome.status = 'published';
+    return dist;
+  };
+  const checkStage = async index => {
+    outcomes[index].stageChecks++;
+    const stage = await stageLookup(entries[index], version);
+    outcomes[index].staging = stage ? 'verified' : 'absent';
+    return stage;
+  };
+  try {
+    if (!hasToken) throw Error('NODE_AUTH_TOKEN ausente no passo de publicação.');
+    await checkpoint();
+    await npm('npm', ['whoami', '--registry', registry, '--loglevel', 'error']);
+    phase = 'preflight';
+    const existing = [], pending = [];
+    // Check all public digests and pending bytes before the first submission.
+    for (const [index] of entries.entries()) {
+      currentIndex = index;
+      existing.push(Boolean(await checkPublic(index)));
+    }
+    for (const [index] of entries.entries()) {
+      currentIndex = index;
+      pending.push(existing[index] ? null : await checkStage(index));
+    }
+    await checkpoint();
+    for (const [index, entry] of entries.entries()) {
+      currentIndex = index;
+      diagnostic = undefined;
+      if (existing[index]) {
+        outcomes[index].status = 'published';
+        console.log(`Já publicado com bytes idênticos: ${entry.name}@${version}`);
+        continue;
+      }
+      if (pending[index]) {
+        Object.assign(outcomes[index], pending[index], { status: 'awaiting-2fa' });
+        console.log(`::notice::Staging conferido, aguardando 2FA: ${entry.name}@${version}, ${pending[index].stageId}`);
+        continue;
+      }
+      const deferSdk = entry.name === packageNames[2] && outcomes.some(item => item.status === 'awaiting-2fa');
+      phase = 'publication';
+      outcomes[index].status = 'publication-unconfirmed';
+      await checkpoint();
+      console.log(`${deferSdk ? 'Enviando SDK para staging' : 'Publicando'}: ${entry.name}@${version}`);
+      const publishArgs = ['publish', entry.tarball, '--access', 'public', '--ignore-scripts', '--dry-run=false', '--json', '--registry', registry, '--loglevel', 'notice'];
+      let result = await npm('npm', deferSdk ? ['stage', ...publishArgs] : publishArgs, { allowFailure: true });
+      if (!deferSdk && classifyNpmError(result) === 'stage-required')
+        result = await npm('npm', ['stage', ...publishArgs], { allowFailure: true });
+      diagnostic = safeNpmDiagnostic(result, entry, version);
+      outcomes[index].npmDiagnostic = diagnostic;
+      // JSON is local tarball metadata, never a publication receipt. Notices may
+      // contain authentication links; only the closed diagnostic schema is logged.
+      console.log(`Diagnóstico npm sanitizado: ${JSON.stringify(diagnostic)}`);
+      phase = 'confirmation';
+      await checkpoint();
+      let dist, staged;
+      // The observed 0.1.1 Linux upload became public after the former
+      // ten-minute confirmation window. Keep one submission and wait longer.
+      const confirmationAttempts = result.code === 0 ? 180 : 3;
+      for (let attempt = 0; attempt < confirmationAttempts; attempt++) {
+        if (attempt) await pause(Math.min(attempt * 1000, 10000));
+        dist = await checkPublic(index);
+        if (dist) break;
+        staged = await checkStage(index);
+        if (staged) break;
+        if (attempt % 6 === 5) await checkpoint();
+      }
+      if (staged) {
+        Object.assign(outcomes[index], staged, { status: 'awaiting-2fa' });
+        await checkpoint();
+        console.log(`::notice::Staging conferido, aguardando 2FA: ${entry.name}@${version}, ${staged.stageId}`);
+        continue;
+      }
+      if (!dist) throw Error(`Publicação não confirmada: ${entry.name} (${safeNpmError(result)}) Consulte o resultado antes de qualquer nova tentativa.`);
+      outcomes[index].status = 'published';
+      await checkpoint();
+    }
+    return { version, status: outcomes.some(entry => entry.status === 'awaiting-2fa') ? 'awaiting-2fa' : 'published', packages: outcomes };
+  } catch (error) {
+    if (currentIndex >= 0 && outcomes[currentIndex].status === 'not-attempted')
+      outcomes[currentIndex].status = ['publication', 'confirmation'].includes(phase) ? 'publication-unconfirmed' : 'blocked';
+    const result = { version, status: 'failed', phase, packages: outcomes,
+      error: { category: phase === 'confirmation' ? 'publication-unconfirmed' : 'publication-failed', ...diagnostic } };
+    // Never relay arbitrary exception text from npm, a response, or a network
+    // failure. Keep only fixed messages for known integrity failures.
+    let message = `Publicação bloqueada na etapa ${phase}. Consulte o resultado sanitizado.`;
+    const causeMessage = typeof error?.message === 'string' ? error.message : '';
+    if (/^A versão já publicada diverge do tarball aprovado:/.test(causeMessage)) message = 'A versão consultada diverge do tarball aprovado.';
+    else if (/^Bytes de staging divergem do tarball aprovado:/.test(causeMessage)) message = 'Bytes de staging divergem do tarball aprovado.';
+    else if (phase === 'confirmation') message = `Publicação não confirmada. Consulte o resultado sanitizado antes de qualquer nova tentativa.`;
+    const failure = new Error(message);
+    failure.publicationResult = result;
+    throw failure;
+  }
+}
+
+export async function inspectBundle(entries, version, {
+  npm = run, lookup = registryDist, hasToken = Boolean(process.env.NODE_AUTH_TOKEN),
+  stageLookup = (entry, version) => stagedArtifact(entry, version, { npm }),
+} = {}) {
+  if (!hasToken) throw Error('NODE_AUTH_TOKEN ausente no diagnóstico autenticado.');
+  await npm('npm', ['whoami', '--registry', registry, '--loglevel', 'error']);
+  const npmVersion = (await npm('npm', ['--version'])).stdout?.trim();
+  if (!/^\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(npmVersion ?? '')) throw Error('Versão npm inválida no diagnóstico.');
+  const dryRunConfigured = parseNpmJson((await npm('npm', ['config', 'get', 'dry-run', '--json'])).stdout);
+  if (typeof dryRunConfigured !== 'boolean') throw Error('Configuração dry-run inválida no diagnóstico.');
+  const packages = [];
   for (const entry of entries) {
     const dist = await lookup(entry, version);
     if (dist) assertRegistryMatches(dist, entry.data, entry.name);
-    existing.push(Boolean(dist));
+    const view = await npm('npm', ['view', `${entry.name}@${version}`, '--json', '--registry', registry, '--loglevel', 'error', '--prefer-online'], { allowFailure: true });
+    let authenticatedVersion = 'unconfirmed';
+    if (view.code === 0) {
+      const metadata = parseNpmJson(view.stdout);
+      if (metadata?.name !== entry.name || metadata.version !== version) throw Error('Metadados autenticados npm incompatíveis.');
+      assertRegistryMatches(metadata.dist, entry.data, entry.name);
+      authenticatedVersion = 'verified';
+    } else if (npmErrorCode(view) === 'E404') authenticatedVersion = 'absent';
+    const stage = await stageLookup(entry, version);
+    packages.push({ name: entry.name, version, publicVersion: dist ? 'verified' : 'absent', authenticatedVersion,
+      staging: stage ? 'verified' : 'absent', ...(stage ? { stageId: stage.stageId } : {}), npmDiagnostic: safeNpmDiagnostic(view, entry, version) });
   }
-  // Check every pending tarball before submitting anything else; never resubmit a staged version.
-  for (const [index, entry] of entries.entries()) pending.push(existing[index] ? null : await stageLookup(entry, version));
-  for (const [index, entry] of entries.entries()) {
-    if (existing[index]) {
-      console.log(`Já publicado com bytes idênticos: ${entry.name}@${version}`);
-      resultEntries.push({ name: entry.name, version, status: 'published' }); continue;
-    }
-    if (pending[index]) {
-      console.log(`::notice::Staging conferido, aguardando 2FA: ${entry.name}@${version}, ${pending[index].stageId}`);
-      resultEntries.push({ ...pending[index], status: 'awaiting-2fa' }); continue;
-    }
-    const deferSdk = entry.name === packageNames[2] && resultEntries.some(item => item.status === 'awaiting-2fa');
-    console.log(`${deferSdk ? 'Enviando SDK para staging' : 'Publicando'}: ${entry.name}@${version}`);
-    let result = await npm('npm', deferSdk
-      ? ['stage', 'publish', entry.tarball, '--access', 'public', '--ignore-scripts', '--json', '--registry', registry, '--loglevel', 'error']
-      : ['publish', entry.tarball, '--access', 'public', '--ignore-scripts', '--registry', registry, '--loglevel', 'error'], { allowFailure: true });
-    if (!deferSdk && classifyNpmError(result) === 'stage-required') {
-      result = await npm('npm', ['stage', 'publish', entry.tarball, '--access', 'public', '--ignore-scripts', '--json', '--registry', registry, '--loglevel', 'error'], { allowFailure: true });
-    }
-    let dist;
-    let staged;
-    // The registry can take several minutes to expose an accepted new package.
-    // Poll for confirmation without submitting the same version again.
-    const confirmationAttempts = result.code === 0 ? 60 : 3;
-    for (let attempt = 0; attempt < confirmationAttempts; attempt++) {
-      if (attempt) await pause(Math.min(attempt * 1000, 10000));
-      dist = await lookup(entry, version);
-      if (dist) break;
-      staged = await stageLookup(entry, version);
-      if (staged) break;
-    }
-    if (staged) {
-      console.log(`::notice::Staging conferido, aguardando 2FA: ${entry.name}@${version}, ${staged.stageId}`);
-      resultEntries.push({ ...staged, status: 'awaiting-2fa' }); continue;
-    }
-    if (!dist) throw Error(`Publicação não confirmada: ${entry.name} (${safeNpmError(result)}) Reexecute para recuperar publicações parciais.`);
-    assertRegistryMatches(dist, entry.data, entry.name);
-    resultEntries.push({ name: entry.name, version, status: 'published' });
+  return { version, status: 'diagnostic-only', npmVersion, dryRunConfigured, packages };
+}
+
+
+const noticeHints = new Set(['dry-run-mentioned', 'approval-mentioned', 'two-factor-mentioned', 'staging-mentioned']);
+function projectDiagnostic(value) {
+  const safe = {};
+  if (Object.hasOwn(value ?? {}, 'exitCode')) safe.exitCode = Number.isInteger(value.exitCode) && value.exitCode >= 0 && value.exitCode <= 255 ? value.exitCode : null;
+  if (npmErrorCodes.has(value?.errorCode)) safe.errorCode = value.errorCode;
+  if (npmCategories.has(value?.errorCategory)) safe.errorCategory = value.errorCategory;
+  if (['publication-failed', 'publication-unconfirmed'].includes(value?.category)) safe.category = value.category;
+  if (['empty', 'json-error', 'tarball-metadata', 'json', 'text'].includes(value?.outputKind)) safe.outputKind = value.outputKind;
+  for (const key of ['tarballMetadataMatches', 'stageIdPresent']) if (typeof value?.[key] === 'boolean') safe[key] = value[key];
+  if (Array.isArray(value?.noticeHints)) safe.noticeHints = [...new Set(value.noticeHints.filter(hint => noticeHints.has(hint)))];
+  return safe;
+}
+
+export async function writePublicationResult(directory, result, summaryPath = process.env.GITHUB_STEP_SUMMARY) {
+  if (!versionPattern.test(result?.version ?? '') || !['published', 'awaiting-2fa', 'failed', 'in-progress', 'diagnostic-only'].includes(result.status) || !Array.isArray(result.packages)) throw Error('Resultado de publicação inválido.');
+  const safe = { version: result.version, status: result.status, packages: result.packages.map(entry => {
+    if (!packageNames.includes(entry.name) || entry.version !== result.version) throw Error('Identidade do resultado de publicação inválida.');
+    const item = { name: entry.name, version: entry.version };
+    if (['published', 'awaiting-2fa', 'publication-unconfirmed', 'not-attempted', 'blocked'].includes(entry.status)) item.status = entry.status;
+    for (const key of ['publicVersion', 'authenticatedVersion', 'staging']) if (['absent', 'verified', 'unconfirmed'].includes(entry[key])) item[key] = entry[key];
+    for (const key of ['registryChecks', 'stageChecks']) if (Number.isInteger(entry[key]) && entry[key] >= 0 && entry[key] <= 10000) item[key] = entry[key];
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(entry.lastRegistryCheckAt ?? '')) item.lastRegistryCheckAt = entry.lastRegistryCheckAt;
+    if (stageIdPattern.test(entry.stageId ?? '') && (entry.stagedBytesMatchApproved === true || (result.status === 'diagnostic-only' && entry.staging === 'verified'))) item.stageId = entry.stageId;
+    if (hashPattern.test(entry.sha256 ?? '')) item.sha256 = entry.sha256;
+    if (Number.isSafeInteger(entry.bytes) && entry.bytes > 0 && entry.bytes <= 200 * 1024 * 1024) item.bytes = entry.bytes;
+    if (typeof entry.stagedBytesMatchApproved === 'boolean') item.stagedBytesMatchApproved = entry.stagedBytesMatchApproved;
+    if (entry.npmDiagnostic) item.npmDiagnostic = projectDiagnostic(entry.npmDiagnostic);
+    return item;
+  }) };
+  if (['authentication', 'preflight', 'publication', 'confirmation'].includes(result.phase)) safe.phase = result.phase;
+  if (result.error) safe.error = projectDiagnostic(result.error);
+  if (typeof result.dryRunConfigured === 'boolean') safe.dryRunConfigured = result.dryRunConfigured;
+  if (/^\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(result.npmVersion ?? '')) safe.npmVersion = result.npmVersion;
+  const filename = result.status === 'diagnostic-only' ? 'NPM_DIAGNOSTIC_RESULT.json' : 'PUBLICATION_RESULT.json';
+  await writeFile(path.join(directory, filename), JSON.stringify(safe, null, 2) + '\n');
+  if (summaryPath) {
+    const lines = safe.packages.map(entry => `- ${entry.name}@${entry.version}: ${entry.status ?? entry.authenticatedVersion}${entry.stageId ? `; stage ${entry.stageId}` : ''}`);
+    await appendFile(summaryPath, `Resultado npm: ${safe.status}${safe.phase ? `; etapa ${safe.phase}` : ''}\n\n${lines.join('\n')}\n`);
   }
-  return { version, status: resultEntries.some(entry => entry.status === 'awaiting-2fa') ? 'awaiting-2fa' : 'published', packages: resultEntries };
+  return safe;
 }
 
 export async function dryRunBundle(entries, version, { npm = run, lookup = registryDist } = {}) {
@@ -306,26 +474,34 @@ export async function dryRunBundle(entries, version, { npm = run, lookup = regis
 
 async function main() {
   const [mode, suppliedDirectory, ...extra] = process.argv.slice(2);
-  if (!['--download', '--validate', '--dry-run', '--publish'].includes(mode) || !suppliedDirectory || extra.length) throw Error('Use --download|--validate|--dry-run|--publish DIRETÓRIO.');
+  if (!['--download', '--validate', '--dry-run', '--publish', '--inspect'].includes(mode) || !suppliedDirectory || extra.length) throw Error('Use --download|--validate|--dry-run|--publish|--inspect DIRETÓRIO.');
   const directory = path.resolve(suppliedDirectory);
   const approved = await readApprovedManifest();
   if (mode === '--download') return downloadBundle(directory, approved.manifest);
   const entries = await validateBundle(directory, approved);
-  if (mode === '--publish') {
-    const result = await publishBundle(entries, approved.manifest.version);
-    await writeFile(path.join(directory, 'PUBLICATION_RESULT.json'), JSON.stringify(result, null, 2) + '\n');
-    if (process.env.GITHUB_STEP_SUMMARY) {
-      const lines = result.packages.map(entry => `- ${entry.name}@${entry.version}: ${entry.status}${entry.stageId ? `; stage ${entry.stageId}; SHA-256 ${entry.sha256}` : ''}`);
-      await appendFile(process.env.GITHUB_STEP_SUMMARY, `Resultado npm: ${result.status}\n\n${lines.join('\n')}\n`);
-    }
-    console.log(`Resultado npm: ${result.status}`);
+  if (mode === '--inspect') {
+    const result = await writePublicationResult(directory, await inspectBundle(entries, approved.manifest.version));
+    console.log(JSON.stringify(result));
     return result;
+  }
+  if (mode === '--publish') {
+    try {
+      const result = await writePublicationResult(directory, await publishBundle(entries, approved.manifest.version, {
+        onProgress: result => writePublicationResult(directory, result, null),
+      }));
+      console.log(`Resultado npm: ${result.status}`);
+      return result;
+    } catch (error) {
+      if (error.publicationResult) await writePublicationResult(directory, error.publicationResult);
+      throw error;
+    }
   }
   if (mode === '--dry-run') {
     await dryRunBundle(entries, approved.manifest.version);
     console.log('Dry run dos três pacotes aprovado; nenhuma publicação executada.');
   }
 }
+
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   main().catch(error => {
     const message = String(error.message).replace(/[\r\n]/g, ' ').slice(0, 500);

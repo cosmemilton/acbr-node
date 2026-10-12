@@ -1,5 +1,25 @@
 # Fontes, contrato e build
 
+## Help de tipos e campos — implementação de desenvolvimento
+
+O help TAG faz parte da release 0.1.2. A documentação pública só anuncia disponibilidade após a confirmação dessa versão no registry npm.
+
+```sh
+node dist/cli.js help TAG Ide.tpNF
+node dist/cli.js help TAG 'Det[].Imposto.PIS.CST' --json
+node dist/cli.js help TAG 'TNFe.Det[0].Prod.DI[].adi[2].nAdicao' --json
+```
+
+`Ide.tpNF` resolve para `TTipoNFe` e apresenta `tnEntrada` e `tnSaida`. O caminho PIS resolve para `TCSTPis`, com seus valores textuais, incluindo `pis99`. Os valores são obtidos do contrato gerado; não há catálogo de enums mantido manualmente.
+
+O prefixo `TNFe.` é opcional. Os nomes dos campos respeitam maiúsculas e minúsculas; `TAG` aceita ambas. `[]` consulta o tipo do elemento de uma coleção. Um índice não negativo, como `[0]`, é normalizado para `[]`: a consulta não lê uma nota nem confere a quantidade de itens. Um nome curto só é aceito quando identifica um caminho único; `CST` retorna `CAMPO_AMBIGUO` com os caminhos possíveis. `Det.Imposto` pede um seletor de coleção, enquanto `Ide[]` é recusado por não ser coleção.
+
+O help lê somente `dist/contract.json`, `package.json` e `acbr.lock.json` da própria instalação. Não consulta configuração do consumidor, runtime, certificado, SVN ou rede e funciona sem dependências opcionais. `--config` e `--revision` não se aplicam a esse comando. Saída JSON contém versão do SDK, revisão ACBr, hashes, caminho canônico, tipo, referências, valores, limites do tipo e indicação de somente leitura. Erros JSON vão para `stderr`, com código de saída 1; uma consulta válida termina com 0.
+
+Os caminhos pertencem ao modelo de entrada do SDK, não são XPath/XML. Por exemplo, o modelo usa `Ide.dEmi`; `Ide.dhEmi` é inexistente. `declaredDefault` é a declaração Pascal, não uma garantia sobre o construtor nativo. Limites primitivos, enums e campos opcionais do TypeScript não substituem regras fiscais, códigos XML, obrigatoriedade ou orientação tributária.
+
+`generate` também emite `generated/acbr/contract.json` a partir do mesmo IR usado pelo validador. O build confere o hash e o lock e distribui esses metadados em `dist/contract.json`, separados dos três arquivos gerados que vinculam o motor.
+
 `init` cria a configuração e copia os fontes do motor e extractor distribuídos no pacote para o projeto do consumidor, preservando arquivos existentes. O CLI usa `acbr.config.json`. Todos os caminhos relativos são resolvidos pelo diretório desse arquivo, independentemente do diretório atual do terminal. Campos desconhecidos, revisão inválida ou outra origem SVN são rejeitados.
 
 ```sh

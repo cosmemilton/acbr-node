@@ -1,7 +1,7 @@
 name: Validate SDK pull request
 on:
   push:
-    branches: [fix/sdk-feedback-cli-queue]
+    branches: [fix/sdk-feedback-cli-queue, fix/npm-publication-confirmation]
   pull_request:
     branches: [main, release]
 permissions:
