@@ -80,9 +80,14 @@ test('real FCL-passrc ACBr closure is deterministic, includes RTC and matches Wi
  const options={acbrRoot:source,outputDir:dir,revision:48590,sourceHash:'a'.repeat(64),extractorPath:path.resolve('tools/extract-model.lpr')};
  const one=await generateModel(options),ir=JSON.parse(await readFile(path.join(dir,'.acbr/generated/model.ir.json'),'utf8'));
  assert.ok(ir.types.length>180);assert.ok(ir.types.some(t=>t.unit==='ACBrDFe.RTC.Classes'));
+ const firstMetadataBytes=await readFile(one.metadataPath);
  const second=await generateModel(options);assert.equal(one.contractHash,second.contractHash);
  const manifest=JSON.parse(await readFile(second.manifestPath,'utf8'));
  assert.equal(manifest.files.length,3);assert.deepEqual(Object.keys(manifest.fileHashes),manifest.files);
+ const metadataBytes=await readFile(second.metadataPath),metadata=JSON.parse(metadataBytes);
+ assert.equal(manifest.metadata.sha256,createHash('sha256').update(metadataBytes).digest('hex'));
+ assert.equal(metadata.contractHash,second.contractHash);assert.deepEqual(metadata.ir,ir);
+ assert.deepEqual(firstMetadataBytes,metadataBytes);
  for(const file of manifest.files)assert.equal(manifest.fileHashes[file],createHash('sha256').update(await readFile(path.join(dir,file))).digest('hex'));
  const changes=JSON.parse(await readFile(second.reportPath,'utf8'));assert.deepEqual(changes,{additions:[],removals:[],changes:[],breaking:false});
  const windows=path.join(dir,'windows.json');await execute(path.join(dir,'.acbr/bin/extract-model'),[source,windows,'win64']);
