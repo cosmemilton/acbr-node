@@ -30,7 +30,7 @@ node scripts/build-native-deps.mjs --project "$PWD"
 O script do pacote instalado também pode ser usado:
 
 ```sh
-node node_modules/@cosmemilton/acbr-node/scripts/build-native-deps.mjs \
+node node_modules/cosmemilton-acbr-node/scripts/build-native-deps.mjs \
   --project "$PWD"
 ```
 

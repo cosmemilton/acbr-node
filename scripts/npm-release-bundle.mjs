@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { appendFile, mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -8,7 +8,7 @@ import { auditRuntime, auditMainInventory, GENERATED_FILES, assertGeneratedHashe
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const registry = 'https://registry.npmjs.org';
-const packageNames = ['@cosmemilton/acbr-node-linux-x64', '@cosmemilton/acbr-node-win32-x64', '@cosmemilton/acbr-node'];
+const packageNames = ['cosmemilton-acbr-node-linux-x64', 'cosmemilton-acbr-node-win32-x64', 'cosmemilton-acbr-node'];
 const versionPattern = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 const hashPattern = /^[a-f0-9]{64}$/;
 const repository = 'git+https://github.com/cosmemilton/acbr-node.git';
@@ -21,7 +21,7 @@ export function assertApprovedManifest(manifest) {
   assertGeneratedHashes(manifest.generated?.fileHashes);
   for (const [index, name] of packageNames.entries()) {
     const entry = manifest.artifacts[index];
-    if (entry.name !== name || entry.file !== `${name.slice(1).replace('/', '-')}-${manifest.version}.tgz` ||
+    if (entry.name !== name || entry.file !== `${name.replace(/^@/, '').replace('/', '-')}-${manifest.version}.tgz` ||
         !hashPattern.test(entry.sha256) || !Number.isSafeInteger(entry.bytes) || entry.bytes <= 0 || entry.bytes > 200 * 1024 * 1024) throw Error('Identidade/hash de tarball inválido.');
   }
   if (!hashPattern.test(manifest.validationSha256) || !hashPattern.test(manifest.checksumsSha256)) throw Error('Hashes de validação ausentes.');
@@ -43,6 +43,7 @@ function npmErrorCode(result) {
 
 export function classifyNpmError(result) {
   const stderr = result.stderr ?? '';
+  if (/\bE_STAGE_REQUIRED\b/.test(stderr)) return 'stage-required';
   if (/scope not found/i.test(stderr)) return 'scope-not-found';
   if (/(?:permission|not allowed|unauthorized|access denied)/i.test(stderr)) return 'access-denied';
   if (/(?:2fa|two-factor|one-time|otp)/i.test(stderr)) return 'two-factor-required';
@@ -55,19 +56,20 @@ export function safeNpmError(result) {
   const detail = code ? `, ${code}` : '';
   const errorCategory = result.errorCategory ?? classifyNpmError(result);
   const hints = {
-    'scope-not-found': 'Confira se a conta npm autenticada possui o escopo @cosmemilton.',
-    'access-denied': 'Confira se o NPM_TOKEN permite criar e publicar os três pacotes no escopo @cosmemilton.',
+    'stage-required': 'O npm exige staging e aprovação do mantenedor com 2FA.',
+    'scope-not-found': 'Confira se o nome do pacote pertence à conta npm autenticada.',
+    'access-denied': 'Confira se o NPM_TOKEN permite criar e publicar os três pacotes cosmemilton-acbr-node.',
     'two-factor-required': 'Confira a política de 2FA e a permissão de publicação automatizada do NPM_TOKEN.',
-    'check-scope-and-token': 'Confira a conta autenticada, o escopo @cosmemilton e as permissões de criação/publicação do NPM_TOKEN.',
+    'check-scope-and-token': 'Confira a conta autenticada, os nomes npm e as permissões de criação/publicação do NPM_TOKEN.',
   };
   const guidance = hints[errorCategory] ?? (['EOTP', 'E401', 'E403', 'ENEEDAUTH'].includes(code)
     ? 'Confira o secret NPM_TOKEN, as permissões dos três pacotes e a política de 2FA no npm.' : '');
   return `exit ${result.code}${detail}${errorCategory ? `, categoria ${errorCategory}` : ''}.${guidance ? ' ' + guidance : ''}`;
 }
 
-async function run(command, args, { allowFailure = false, env = process.env } = {}) {
+async function run(command, args, { allowFailure = false, env = process.env, cwd = root } = {}) {
   const result = await new Promise((resolve, reject) => {
-    const child = spawn(command, args, { cwd: root, env, shell: false, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(command, args, { cwd, env, shell: false, stdio: ['ignore', 'pipe', 'pipe'] });
     let stdout = '', stderr = '';
     child.stdout.on('data', chunk => { stdout += chunk; });
     child.stderr.on('data', chunk => { stderr += chunk; });
@@ -153,7 +155,7 @@ export async function validateBundle(directory, approved = undefined) {
       await run('python3', [path.join(root, 'scripts/unpack-npm-tarball.py'), path.join(directory, entry.file), target]);
       const packageDirectory = path.join(target, 'package');
       const pkg = JSON.parse(await readFile(path.join(packageDirectory, 'package.json'), 'utf8'));
-      const workspacePackage = JSON.parse(await readFile(path.join(root, entry.name === packageNames[2] ? 'package.json' : `packages/${entry.name.split('/')[1]}/package.json`), 'utf8'));
+      const workspacePackage = JSON.parse(await readFile(path.join(root, entry.name === packageNames[2] ? 'package.json' : `packages/${entry.name.replace(/^cosmemilton-/, '')}/package.json`), 'utf8'));
       if (pkg.name !== entry.name || pkg.version !== manifest.version || pkg.license !== 'LGPL-2.1-or-later' ||
           pkg.publishConfig?.access !== 'public' || pkg.repository?.url !== repository || pkg.homepage !== homepage ||
           JSON.stringify(pkg) !== JSON.stringify(workspacePackage) || pkg.scripts?.prepublishOnly || pkg.scripts?.publish || pkg.scripts?.postpublish) throw Error(`Metadados npm incompatíveis: ${entry.name}`);
@@ -180,7 +182,7 @@ export async function validateBundle(directory, approved = undefined) {
 }
 
 async function registryDist(entry, version) {
-  const response = await fetch(`${registry}/${encodeURIComponent(entry.name)}/${version}`, { redirect: 'error', signal: AbortSignal.timeout(30000) });
+  const response = await fetch(`${registry}/${encodeURIComponent(entry.name)}/${version}`, { headers: { 'cache-control': 'no-cache' }, redirect: 'error', signal: AbortSignal.timeout(30000) });
   if (response.status === 404) return null;
   if (!response.ok) throw Error(`Não foi possível consultar a versão npm: ${entry.name}, HTTP ${response.status}`);
   const metadata = await response.json();
@@ -188,8 +190,47 @@ async function registryDist(entry, version) {
   return metadata.dist;
 }
 
+const stageIdPattern = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
+function parseStageJson(result) {
+  try { return JSON.parse(result.stdout); }
+  catch { throw Error('Resposta JSON de staging npm inválida.'); }
+}
+
+function assertStageIdentity(stage, entry, version) {
+  if (!stageIdPattern.test(stage?.id ?? '') || stage.packageName !== entry.name ||
+      stage.version !== version || stage.tag !== 'latest' || (stage.access !== undefined && stage.access !== 'public')) {
+    throw Error('Identidade/política de staging npm incompatível.');
+  }
+  assertRegistryMatches({ shasum: stage.shasum }, entry.data, entry.name);
+}
+
+export async function stagedArtifact(entry, version, { npm = run } = {}) {
+  const list = parseStageJson(await npm('npm', ['stage', 'list', entry.name, '--json', '--registry', registry, '--loglevel', 'error']));
+  if (!Array.isArray(list)) throw Error('Lista de staging npm inválida.');
+  const matching = list.filter(item => item.packageName === entry.name && item.version === version);
+  if (!matching.length) return null;
+  if (matching.length !== 1) throw Error('Mais de um staging corresponde à versão aprovada.');
+  const stage = matching[0];
+  assertStageIdentity(stage, entry, version);
+  const details = parseStageJson(await npm('npm', ['stage', 'view', stage.id, '--json', '--registry', registry, '--loglevel', 'error']));
+  assertStageIdentity(details, entry, version);
+  if (details.id !== stage.id) throw Error('O identificador de staging npm mudou.');
+  const directory = await mkdtemp(path.join(tmpdir(), 'acbr-npm-stage-'));
+  try {
+    await npm('npm', ['stage', 'download', stage.id, '--json', '--registry', registry, '--loglevel', 'error'], { cwd: directory });
+    const files = await readdir(directory, { withFileTypes: true });
+    const expected = `${entry.name.replace(/^@/, '').replace('/', '-')}-${version}-${stage.id}.tgz`;
+    if (files.length !== 1 || !files[0].isFile() || files[0].name !== expected) throw Error('Download de staging npm incompatível.');
+    const data = await readFile(path.join(directory, expected));
+    if (!data.equals(entry.data)) throw Error(`Bytes de staging divergem do tarball aprovado: ${entry.name}`);
+    return { name: entry.name, version, stageId: stage.id, bytes: data.length,
+      sha256: createHash('sha256').update(data).digest('hex'), stagedBytesMatchApproved: true };
+  } finally { await rm(directory, { recursive: true, force: true }); }
+}
+
 export async function publishBundle(entries, version, {
   npm = run, lookup = registryDist, hasToken = Boolean(process.env.NODE_AUTH_TOKEN),
+  stageLookup = (entry, version) => stagedArtifact(entry, version, { npm }),
   pause = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds)),
 } = {}) {
   if (!hasToken) throw Error('NODE_AUTH_TOKEN ausente no passo de publicação.');
@@ -197,24 +238,69 @@ export async function publishBundle(entries, version, {
   const username = authentication.stdout?.trim();
   if (username && /^[a-z0-9_-]+$/i.test(username)) console.log(`::notice::Conta npm autenticada: ${username}`);
   const existing = [];
+  const pending = [];
+  const resultEntries = [];
   // Detect every published-version conflict before publishing any missing package.
   for (const entry of entries) {
     const dist = await lookup(entry, version);
     if (dist) assertRegistryMatches(dist, entry.data, entry.name);
     existing.push(Boolean(dist));
   }
+  // Check every pending tarball before submitting anything else; never resubmit a staged version.
+  for (const [index, entry] of entries.entries()) pending.push(existing[index] ? null : await stageLookup(entry, version));
   for (const [index, entry] of entries.entries()) {
-    if (existing[index]) { console.log(`Já publicado com bytes idênticos: ${entry.name}@${version}`); continue; }
-    console.log(`Publicando: ${entry.name}@${version}`);
-    const result = await npm('npm', ['publish', entry.tarball, '--access', 'public', '--ignore-scripts', '--registry', registry, '--loglevel', 'error'], { allowFailure: true });
+    if (existing[index]) {
+      console.log(`Já publicado com bytes idênticos: ${entry.name}@${version}`);
+      resultEntries.push({ name: entry.name, version, status: 'published' }); continue;
+    }
+    if (pending[index]) {
+      console.log(`::notice::Staging conferido, aguardando 2FA: ${entry.name}@${version}, ${pending[index].stageId}`);
+      resultEntries.push({ ...pending[index], status: 'awaiting-2fa' }); continue;
+    }
+    const deferSdk = entry.name === packageNames[2] && resultEntries.some(item => item.status === 'awaiting-2fa');
+    console.log(`${deferSdk ? 'Enviando SDK para staging' : 'Publicando'}: ${entry.name}@${version}`);
+    let result = await npm('npm', deferSdk
+      ? ['stage', 'publish', entry.tarball, '--access', 'public', '--ignore-scripts', '--json', '--registry', registry, '--loglevel', 'error']
+      : ['publish', entry.tarball, '--access', 'public', '--ignore-scripts', '--registry', registry, '--loglevel', 'error'], { allowFailure: true });
+    if (!deferSdk && classifyNpmError(result) === 'stage-required') {
+      result = await npm('npm', ['stage', 'publish', entry.tarball, '--access', 'public', '--ignore-scripts', '--json', '--registry', registry, '--loglevel', 'error'], { allowFailure: true });
+    }
     let dist;
-    for (let attempt = 0; attempt < 3; attempt++) {
-      if (attempt) await pause(attempt * 1000);
+    let staged;
+    // The registry can take several minutes to expose an accepted new package.
+    // Poll for confirmation without submitting the same version again.
+    const confirmationAttempts = result.code === 0 ? 60 : 3;
+    for (let attempt = 0; attempt < confirmationAttempts; attempt++) {
+      if (attempt) await pause(Math.min(attempt * 1000, 10000));
       dist = await lookup(entry, version);
       if (dist) break;
+      staged = await stageLookup(entry, version);
+      if (staged) break;
+    }
+    if (staged) {
+      console.log(`::notice::Staging conferido, aguardando 2FA: ${entry.name}@${version}, ${staged.stageId}`);
+      resultEntries.push({ ...staged, status: 'awaiting-2fa' }); continue;
     }
     if (!dist) throw Error(`Publicação não confirmada: ${entry.name} (${safeNpmError(result)}) Reexecute para recuperar publicações parciais.`);
     assertRegistryMatches(dist, entry.data, entry.name);
+    resultEntries.push({ name: entry.name, version, status: 'published' });
+  }
+  return { version, status: resultEntries.some(entry => entry.status === 'awaiting-2fa') ? 'awaiting-2fa' : 'published', packages: resultEntries };
+}
+
+export async function dryRunBundle(entries, version, { npm = run, lookup = registryDist } = {}) {
+  const existing = [];
+  for (const entry of entries) {
+    const dist = await lookup(entry, version);
+    if (dist) assertRegistryMatches(dist, entry.data, entry.name);
+    existing.push(Boolean(dist));
+  }
+  for (const [index, entry] of entries.entries()) {
+    if (existing[index]) {
+      console.log(`Dry run dispensado para versão pública com bytes idênticos: ${entry.name}@${version}`);
+      continue;
+    }
+    await npm('npm', ['publish', entry.tarball, '--dry-run', '--access', 'public', '--ignore-scripts', '--registry', registry, '--loglevel', 'error']);
   }
 }
 
@@ -225,9 +311,18 @@ async function main() {
   const approved = await readApprovedManifest();
   if (mode === '--download') return downloadBundle(directory, approved.manifest);
   const entries = await validateBundle(directory, approved);
-  if (mode === '--publish') return publishBundle(entries, approved.manifest.version);
+  if (mode === '--publish') {
+    const result = await publishBundle(entries, approved.manifest.version);
+    await writeFile(path.join(directory, 'PUBLICATION_RESULT.json'), JSON.stringify(result, null, 2) + '\n');
+    if (process.env.GITHUB_STEP_SUMMARY) {
+      const lines = result.packages.map(entry => `- ${entry.name}@${entry.version}: ${entry.status}${entry.stageId ? `; stage ${entry.stageId}; SHA-256 ${entry.sha256}` : ''}`);
+      await appendFile(process.env.GITHUB_STEP_SUMMARY, `Resultado npm: ${result.status}\n\n${lines.join('\n')}\n`);
+    }
+    console.log(`Resultado npm: ${result.status}`);
+    return result;
+  }
   if (mode === '--dry-run') {
-    for (const entry of entries) await run('npm', ['publish', entry.tarball, '--dry-run', '--access', 'public', '--ignore-scripts', '--registry', registry, '--loglevel', 'error']);
+    await dryRunBundle(entries, approved.manifest.version);
     console.log('Dry run dos três pacotes aprovado; nenhuma publicação executada.');
   }
 }

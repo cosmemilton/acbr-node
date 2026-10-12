@@ -13,8 +13,9 @@ for (let i = 2; i < process.argv.length; i += 2) {
     throw Error('Use --main MAIN.tgz --runtime RUNTIME.tgz --directory EMPTY_DIR [--node NODE] [--npm-cli npm-cli.js].');
   args.set(process.argv[i], process.argv[i + 1]);
 }
-const main = resolve(args.get('--main') ?? join(root, '.acbr/artifacts/cosmemilton-acbr-node-0.1.0.tgz'));
-const native = resolve(args.get('--runtime') ?? join(root, '.acbr/artifacts/cosmemilton-acbr-node-' + process.platform + '-x64-0.1.0.tgz'));
+const version = JSON.parse(await readFile(join(root, 'package.json'), 'utf8')).version;
+const main = resolve(args.get('--main') ?? join(root, `.acbr/artifacts/cosmemilton-acbr-node-${version}.tgz`));
+const native = resolve(args.get('--runtime') ?? join(root, `.acbr/artifacts/cosmemilton-acbr-node-${process.platform}-x64-${version}.tgz`));
 const directory = resolve(args.get('--directory') ?? join(root, '../acbr-node-runtime-consumer-' + process.platform));
 const fromRoot=relative(root,directory);
 assert.ok(fromRoot && (fromRoot==='..'||fromRoot.startsWith('..'+sep)||isAbsolute(fromRoot)),'Consumer must be outside the source project.');
@@ -53,8 +54,8 @@ const path=require('node:path');
 const cp=require('node:child_process');
 (async()=>{
  const kind=process.argv[2];
- const sdk=kind==='esm'?await import('@cosmemilton/acbr-node'):require('@cosmemilton/acbr-node');
- const nativeName='@cosmemilton/acbr-node-'+process.platform+'-x64';
+ const sdk=kind==='esm'?await import('cosmemilton-acbr-node'):require('cosmemilton-acbr-node');
+ const nativeName='cosmemilton-acbr-node-'+process.platform+'-x64';
  const runtime=path.join(path.dirname(require.resolve(nativeName+'/package.json')),'runtime');
  const worker=path.join(runtime,process.platform==='win32'?'acbr-worker.exe':'acbr-worker');
  const nodeBin=path.dirname(process.execPath);

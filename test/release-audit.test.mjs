@@ -14,7 +14,7 @@ async function fixture(t, platform = 'linux') {
  await put('native/acbr-worker.lpr');
  const relative = 'packages/acbr-node-' + platform + '-x64';
  const directory = path.join(root, relative); const runtime = path.join(directory,'runtime');
- await put(relative+'/package.json', JSON.stringify({ name:'@cosmemilton/acbr-node-'+platform+'-x64', version:'0.1.0' }));
+ await put(relative+'/package.json', JSON.stringify({ name:'cosmemilton-acbr-node-'+platform+'-x64', version:'0.1.0' }));
  const build = { sourceRevision:48590, sourceTreeHash:lock.source.treeHash, testOnly:false };
  const files = {};
  const required = ['acbr-worker','licenses/ACBr-LICENSE.TXT','licenses/FPC-COPYING.GPL.txt','licenses/FPC-COPYING.LGPL.txt','licenses/FPC-COPYING.FPC','licenses/Lazarus-COPYING.txt','licenses/Lazarus-COPYING.LGPL.txt','licenses/Lazarus-COPYING.modifiedLGPL.txt','licenses/toolchain-notices.json','sources/acbr-source.tar.gz','sources/native-dependencies.json','ACBrNFeServicos.ini','openssl.cnf','schemas/nfe.xsd'];

@@ -56,7 +56,23 @@ test('generated models preserve decimal strings, readonly fields and nested list
  assert.throws(()=>m.validateTNFe({Computed:'forged'}),/somente leitura/);
  assert.throws(()=>m.validateTNFe({Date:'2026-02-30'}),/data inválida/);
  assert.throws(()=>m.validateTNFe({Date:'2026-10-08T12:00:00-03:00'}),/timezone/);
- assert.throws(()=>m.validateTNFe({Children:[{Unknown:1}]}),/TNFe.Children\[0\].Unknown/);
+ assert.throws(()=>m.validateTNFe({Children:[{Unknown:1}]}),e=>e instanceof TypeError&&e.diagnostico.campo==='TNFe.Children[0]'&&e.codigo==='CAMPO_DESCONHECIDO');
+});
+
+test('model diagnostics identify the field and action without echoing input or unknown keys',async t=>{
+ const m=await loadRendered(buildModelIR(raw()),t),secret='SYNTHETIC_PRIVATE_VALUE';
+ for(const value of [secret,'2026-10-08T12:00:00Z','2026-10-08T12:00:00-03:00',123]){
+  assert.throws(()=>new m.TNFe({Date:value}),e=>{
+   assert(e instanceof TypeError);assert(e instanceof m.ErroValidacaoModelo);
+   assert.equal(e.diagnostico.codigo,'DATA_HORA_INVALIDA');assert.equal(e.diagnostico.campo,'TNFe.Date');
+   assert.equal(e.diagnostico.statusEnvio,'nao_enviado');assert.match(e.diagnostico.acao,/AAAA-MM-DDTHH:mm:ss/);
+   assert(!JSON.stringify(e).includes(secret));assert(!e.stack.includes(secret));assert(Object.isFrozen(e.diagnostico));return true;
+  });
+ }
+ assert.throws(()=>m.validateTNFe({Children:[{[secret]:secret}]}),e=>!JSON.stringify(e).includes(secret)&&!e.stack.includes(secret)&&e.diagnostico.campo==='TNFe.Children[0]');
+ assert.throws(()=>m.validateModel(secret,{}),e=>!JSON.stringify(e).includes(secret)&&!e.stack.includes(secret));
+ assert.throws(()=>m.validateModel('TNFe',{Date:secret},secret),e=>e.diagnostico.campo==='TNFe.Date'&&!e.stack.includes(secret));
+ assert.throws(()=>m.validateTNFe({Computed:secret}),e=>e.diagnostico.campo==='TNFe.Computed'&&e.codigo==='CAMPO_SOMENTE_LEITURA'&&!JSON.stringify(e).includes(secret));
 });
 test('real FCL-passrc ACBr closure is deterministic, includes RTC and matches Windows declarations',async t=>{
  const source=path.resolve('.acbr/source');try{await access(source);}catch{t.skip('requires the source fetched by CLI');return;}

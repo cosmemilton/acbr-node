@@ -1,0 +1,46 @@
+{
+  "formatVersion": 1,
+  "version": "0.1.1",
+  "baseUrl": "https://miltonjunior.dev.br/acbr-node/releases/0.1.1/",
+  "publicationAuthorizedOn": "2026-10-12",
+  "generated": {
+    "schemaVersion": 1,
+    "sourceRevision": 48590,
+    "sourceHash": "6b768e4f45b4092d040f7576d6fb799d8b66b45ae29a0902c37334fb7c5c6816",
+    "contractHash": "e5a497cefe8e0e350a30da5cc04e88b35c38a98535893d52f878890260d1346d",
+    "root": "TNFe",
+    "models": 204,
+    "files": [
+      "generated/acbr/models.ts",
+      "generated/acbr/index.ts",
+      "native/generated/AcbrModels.pas"
+    ],
+    "fileHashes": {
+      "generated/acbr/models.ts": "5efd68ec7d64d57ac7a1bbfe2a6286c459c5cbd3139ab557ddfb9b92b2e485d2",
+      "generated/acbr/index.ts": "4a4971615be81f2c0031d4d2795a4c09551f50910bce649bf773eb8c44f77cdd",
+      "native/generated/AcbrModels.pas": "5f6f5d66056bba38fe8892d79d5a8678cc4ac676f1a9f0b5f69f0fcf6458aa84"
+    }
+  },
+  "artifacts": [
+    {
+      "name": "cosmemilton-acbr-node-linux-x64",
+      "file": "cosmemilton-acbr-node-linux-x64-0.1.1.tgz",
+      "bytes": 51569703,
+      "sha256": "860c0efaf6c58c8af0ace2c3577abf8d5738a0a05399a7376505de51513b1202"
+    },
+    {
+      "name": "cosmemilton-acbr-node-win32-x64",
+      "file": "cosmemilton-acbr-node-win32-x64-0.1.1.tgz",
+      "bytes": 33668402,
+      "sha256": "25577ba3007871191b7f0cb2f5d1346e1cbac7f7f47b06549df0d9a6784f809d"
+    },
+    {
+      "name": "cosmemilton-acbr-node",
+      "file": "cosmemilton-acbr-node-0.1.1.tgz",
+      "bytes": 606191,
+      "sha256": "97e7a89603199760e4f635d72e6ce25381298631fbb19614c8e3d76fe2b10862"
+    }
+  ],
+  "validationSha256": "eca252bc7184b1408d182b996085fc39b3c6f1916c9ff7b3438fe8482453cf6e",
+  "checksumsSha256": "d988905cba8a6b90b9af18bf968ac8bf82814d864b9254b7301c418b7ea07a36"
+}

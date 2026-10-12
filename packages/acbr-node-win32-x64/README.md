@@ -1,6 +1,6 @@
-# @cosmemilton/acbr-node-win32-x64
+# cosmemilton-acbr-node-win32-x64
 
-Runtime fiscal Free Pascal/ACBr para [@cosmemilton/acbr-node](https://www.npmjs.com/package/@cosmemilton/acbr-node), instalado automaticamente pelo pacote principal na plataforma Windows x64.
+Runtime fiscal Free Pascal/ACBr para [cosmemilton-acbr-node](https://www.npmjs.com/package/cosmemilton-acbr-node), instalado automaticamente pelo pacote principal na plataforma Windows x64.
 
 [Documentação e exemplos](https://miltonjunior.dev.br/acbr-node/) · [Código e problemas](https://github.com/cosmemilton/acbr-node)
 

@@ -1,4 +1,4 @@
-# @cosmemilton/acbr-node
+# cosmemilton-acbr-node
 
 NF-e (55) e NFC-e (65) no Node.js, com modelos TypeScript gerados dos fontes públicos do ACBr e motor compilado com Free Pascal/Lazarus. Projeto independente; não é um produto oficial do ACBr. Não depende de Delphi nem dos binários ACBr Pro.
 
@@ -9,7 +9,7 @@ Requisitos de execução: Node.js 22.12 ou superior e Linux x64 Ubuntu 24.04/gli
 ## Instalação e uso
 
 ```bash
-npm install @cosmemilton/acbr-node
+npm install cosmemilton-acbr-node
 ```
 
 O npm instala o runtime opcional da sua plataforma. Não use `--omit=optional` na instalação final. Também é possível informar `runtimeDirectory` para um motor próprio.
@@ -26,7 +26,7 @@ No Windows, selecione `cosmemilton-acbr-node-win32-x64-0.1.0.tgz`.
 
 ```ts
 import { readFile, writeFile } from 'node:fs/promises';
-import { criarEmissor, TNFe, type TNFeInput } from '@cosmemilton/acbr-node';
+import { criarEmissor, TNFe, type TNFeInput } from 'cosmemilton-acbr-node';
 import { nota } from './nota.js'; // nota: TNFeInput, com dados fiscais completos
 
 const senha = process.env.NFE_A1_SENHA;
@@ -74,7 +74,7 @@ npx acbr-node check
 npx acbr-node doctor
 ```
 
-Use `npx @cosmemilton/acbr-node init` sem instalação prévia. O comando `generate` produz `generated/acbr/models.ts` e `generated/acbr/index.ts`, além do carregador Pascal. Em uma aplicação com revisão própria, importe `criarEmissor` de `./generated/acbr/index.js` e indique o diretório do runtime compilado.
+Use `npx cosmemilton-acbr-node init` sem instalação prévia. O comando `generate` produz `generated/acbr/models.ts` e `generated/acbr/index.ts`, além do carregador Pascal. Em uma aplicação com revisão própria, importe `criarEmissor` de `./generated/acbr/index.js` e indique o diretório do runtime compilado.
 
 O relatório `.acbr/generated/changes.json` registra adições, remoções e alterações de tipos. Tipos desconhecidos interrompem a geração. Breaking changes do ACBr exigem acompanhamento, testes e versionamento do adaptador. TortoiseSVN é opcional; a CLI usa SVN. [Fluxo completo da CLI](docs/CLI.md).
 
