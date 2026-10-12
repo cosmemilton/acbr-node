@@ -14,15 +14,17 @@ npm install cosmemilton-acbr-node
 
 O npm instala o runtime opcional da sua plataforma. Não use `--omit=optional` na instalação final. Também é possível informar `runtimeDirectory` para um motor próprio.
 
+O help TAG faz parte da release 0.1.2. A documentação pública só anuncia disponibilidade após a confirmação dessa versão no registry npm.
+
 Para instalar tarballs revisados em um projeto separado, informe o SDK e o runtime da plataforma:
 
 ```bash
 npm install --offline --ignore-scripts --no-audit --no-fund \
-  /caminho/cosmemilton-acbr-node-0.1.0.tgz \
-  /caminho/cosmemilton-acbr-node-linux-x64-0.1.0.tgz
+  /caminho/cosmemilton-acbr-node-0.1.2.tgz \
+  /caminho/cosmemilton-acbr-node-linux-x64-0.1.2.tgz
 ```
 
-No Windows, selecione `cosmemilton-acbr-node-win32-x64-0.1.0.tgz`.
+No Windows, selecione `cosmemilton-acbr-node-win32-x64-0.1.2.tgz`.
 
 ```ts
 import { readFile, writeFile } from 'node:fs/promises';
@@ -63,7 +65,7 @@ A biblioteca também aceita XML pronto em `assinar`, `validar` e `transmitir`. A
 
 Nomes, grupos e enums espelham o ACBr. Construtores recebem objetos; coleções são arrays tipados e oferecem `New()`. Valores decimais são strings, preservando escala e evitando conversão binária pelo JavaScript. Datas são strings ISO civis, por exemplo `2026-10-08T12:30:00`; o ACBr aplica o fuso da UF na escrita do XML. Campos omitidos preservam os padrões do componente. Assinatura, protocolo e informações suplementares produzidas pelo motor não são entradas editáveis.
 
-A versão 0.1.0 acompanha a revisão SVN **48590**, com **204 tipos gerados** e contrato `e5a497cefe8e0e350a30da5cc04e88b35c38a98535893d52f878890260d1346d`. Revisão, inventário e hashes estão em `acbr.lock.json`; cliente e motor recusam contratos diferentes. Não há atualização automática dos fontes ao instalar.
+A versão 0.1.2 acompanha a revisão SVN **48590**, com **204 tipos gerados** e contrato `e5a497cefe8e0e350a30da5cc04e88b35c38a98535893d52f878890260d1346d`. Revisão, inventário e hashes estão em `acbr.lock.json`; cliente e motor recusam contratos diferentes. Não há atualização automática dos fontes ao instalar.
 
 ```bash
 npx acbr-node init --revision 48590

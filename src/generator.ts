@@ -195,6 +195,10 @@ export function renderTypeScript(ir:ModelIR,revision:number,contractHash:string)
  return out.join('\n')+'\n';
 }
 
+export function renderContractMetadata(ir:ModelIR,sourceRevision:number,sourceHash:string,contractHash:string):string {
+ if(hash(stable({sourceRevision,sourceHash,ir}))!==contractHash)throw new Error('Hash do contrato diverge dos metadados gerados.');
+ return stable({formatVersion:1,sourceRevision,sourceHash,contractHash,ir})+'\n';
+}
 export function renderPascal(ir:ModelIR,revision:number,contractHash:string):string {
  const classes=ir.types.filter(t=>t.kind==='object'),byName=new Map(ir.types.map(t=>[t.name,t]));
  const units=[...new Set(ir.types.map(t=>t.unit))].sort();
@@ -308,10 +312,12 @@ export async function generateModel(options:GenerateOptions){
  const files=[path.relative(root,path.join(models,'models.ts')),path.relative(root,path.join(models,'index.ts')),path.relative(root,path.join(native,'AcbrModels.pas'))].map(f=>f.replaceAll('\\','/'));
  const content=[renderTypeScript(ir,sourceRevision,contractHash),renderClientIndex(),renderPascal(ir,sourceRevision,contractHash)];
  const fileHashes=Object.fromEntries(files.map((file,index)=>[file,hash(content[index])]));
+ const metadataPath=path.join(models,'contract.json'),metadataContent=renderContractMetadata(ir,sourceRevision,sourceHash,contractHash);
  await Promise.all([
   ...files.map((file,index)=>writeFile(path.resolve(root,file),content[index],'utf8')),
   writeFile(path.join(cache,'model.ir.json'),JSON.stringify(ir,null,2)+'\n','utf8'),
+  writeFile(metadataPath,metadataContent,'utf8'),
   writeFile(reportPath,JSON.stringify(report,null,2)+'\n','utf8'),
-  writeFile(manifestPath,JSON.stringify({schemaVersion:1,sourceRevision,sourceHash,contractHash,root:ir.root,models:ir.types.length,files,fileHashes},null,2)+'\n','utf8')
- ]);return {contractHash,sourceHash,models:ir.types.length,reportPath,manifestPath};
+  writeFile(manifestPath,JSON.stringify({schemaVersion:1,sourceRevision,sourceHash,contractHash,root:ir.root,models:ir.types.length,files,fileHashes,metadata:{file:path.relative(root,metadataPath).replaceAll('\\','/'),sha256:hash(metadataContent)}},null,2)+'\n','utf8')
+ ]);return {contractHash,sourceHash,models:ir.types.length,reportPath,manifestPath,metadataPath};
 }

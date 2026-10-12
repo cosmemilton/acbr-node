@@ -192,7 +192,7 @@ test('an identical pending runtime is skipped while Windows publishes and the SD
         const entry = entries[1];
         published.set(entry.name, { shasum: digest(entry.data) });
       } else if (args[0] === 'stage') {
-        assert.deepEqual(args, ['stage', 'publish', entries[2].tarball, '--access', 'public', '--ignore-scripts', '--json', '--registry', registry, '--loglevel', 'error']);
+        assert.deepEqual(args, ['stage', 'publish', entries[2].tarball, '--access', 'public', '--ignore-scripts', '--dry-run=false', '--json', '--registry', registry, '--loglevel', 'notice']);
         sdkStaged = true;
       } else assert.equal(args[0], 'whoami');
       return { code: 0 };
@@ -207,6 +207,23 @@ test('an identical pending runtime is skipped while Windows publishes and the SD
   assert.equal(result.packages[2].stagedBytesMatchApproved, true);
 });
 
+test('metadata appearing after the former ten-minute window is confirmed without a second submission', async () => {
+  const entry = { name: 'sdk', data: Buffer.from('late registry visibility'), tarball: 'sdk.tgz' };
+  const dist = { shasum: digest(entry.data) };
+  let checks = 0, submissions = 0;
+  const result = await publishBundle([entry], version, {
+    hasToken: true, pause: async () => {}, stageLookup: noStages,
+    lookup: async () => ++checks < 150 ? null : dist,
+    npm: async (command, args) => {
+      if (args[0] === 'publish') { submissions++; assert.ok(args.includes('--dry-run=false')); }
+      return { code: 0 };
+    },
+  });
+  assert.equal(result.status, 'published');
+  assert.equal(submissions, 1);
+  assert.equal(checks, 150);
+});
+
 test('both pending runtimes keep the SDK out of public publication and submit only its exact approved tarball to staging', async () => {
   const entries = releaseEntries();
   const calls = [];
@@ -219,7 +236,7 @@ test('both pending runtimes keep the SDK out of public publication and submit on
       assert.equal(command, 'npm');
       calls.push(args);
       if (args[0] === 'whoami') return { code: 0 };
-      assert.deepEqual(args, ['stage', 'publish', entries[2].tarball, '--access', 'public', '--ignore-scripts', '--json', '--registry', registry, '--loglevel', 'error']);
+      assert.deepEqual(args, ['stage', 'publish', entries[2].tarball, '--access', 'public', '--ignore-scripts', '--dry-run=false', '--json', '--registry', registry, '--loglevel', 'notice']);
       assert.equal(options.allowFailure, true);
       sdkStaged = true;
       return { code: 0 };
@@ -280,7 +297,7 @@ test('E_STAGE_REQUIRED falls back once to staging the exact reviewed tarball wit
         },
       });
       assert.deepEqual(calls.map(call => call.args[0]), ['whoami', 'publish', 'stage']);
-      assert.deepEqual(calls[2].args, ['stage', 'publish', entry.tarball, '--access', 'public', '--ignore-scripts', '--json', '--registry', registry, '--loglevel', 'error']);
+      assert.deepEqual(calls[2].args, ['stage', 'publish', entry.tarball, '--access', 'public', '--ignore-scripts', '--dry-run=false', '--json', '--registry', registry, '--loglevel', 'notice']);
       assert.equal(calls[1].options.allowFailure, true);
       assert.equal(calls[2].options.allowFailure, true);
       assert.equal(result.status, 'awaiting-2fa');

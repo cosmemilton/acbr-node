@@ -1,0 +1,155 @@
+{
+  "version": "0.1.2",
+  "publication": "authorized",
+  "sourceRevision": 48590,
+  "sourceHash": "6b768e4f45b4092d040f7576d6fb799d8b66b45ae29a0902c37334fb7c5c6816",
+  "contractHash": "e5a497cefe8e0e350a30da5cc04e88b35c38a98535893d52f878890260d1346d",
+  "generatedModels": 204,
+  "checks": {
+    "typecheck": "passed",
+    "javascriptBundles": "rebuilt",
+    "tarballAudit": "passed",
+    "npmDryRun": "passed",
+    "publicSourceAudit": {
+      "status": "passed",
+      "filesScanned": 20,
+      "scope": "Only SDK release source; no private fiscal directories read"
+    },
+    "pullRequestCi": "required-before-release-merge",
+    "windowsSdk": {
+      "passed": 114,
+      "failed": 0,
+      "skipped": 6,
+      "node": "v24.18.0"
+    },
+    "linuxSdk": {
+      "passed": 116,
+      "failed": 0,
+      "skipped": 4,
+      "node": "v24.15.0"
+    },
+    "installedPackage": {
+      "win32": {
+        "help": {
+          "checks": 6,
+          "passed": 6,
+          "optionalRuntimesInstalled": false,
+          "networkFromHelp": 0,
+          "subprocessesFromHelp": 0,
+          "configOrCertificateReadsFromHelp": 0,
+          "cliShim": "passed"
+        },
+        "native": [
+          {
+            "kind": "esm",
+            "node": "v24.18.0",
+            "fixtures": 4,
+            "offlineOperations": 12,
+            "compilerPathAbsent": true,
+            "sourceCheckoutUnused": true
+          },
+          {
+            "kind": "cjs",
+            "node": "v24.18.0",
+            "fixtures": 4,
+            "offlineOperations": 12,
+            "compilerPathAbsent": true,
+            "sourceCheckoutUnused": true
+          }
+        ]
+      },
+      "linux": {
+        "help": {
+          "checks": 6,
+          "passed": 6,
+          "optionalRuntimesInstalled": false,
+          "networkFromHelp": 0,
+          "subprocessesFromHelp": 0,
+          "configOrCertificateReadsFromHelp": 0,
+          "cliShim": "passed"
+        },
+        "native": [
+          {
+            "kind": "esm",
+            "node": "v24.15.0",
+            "fixtures": 4,
+            "offlineOperations": 12,
+            "compilerPathAbsent": true,
+            "sourceCheckoutUnused": true
+          },
+          {
+            "kind": "cjs",
+            "node": "v24.15.0",
+            "fixtures": 4,
+            "offlineOperations": 12,
+            "compilerPathAbsent": true,
+            "sourceCheckoutUnused": true
+          }
+        ]
+      }
+    },
+    "generatedClient": {
+      "deterministicFclClosurePassed": true,
+      "sourceRevision": 48590,
+      "models": 204,
+      "contractUnchanged": true,
+      "pascalBytesUnchanged": true,
+      "contractMetadataGeneratedFromIR": true
+    }
+  },
+  "nativeReuse": {
+    "formatVersion": 1,
+    "fromVersion": "0.1.1",
+    "toVersion": "0.1.2",
+    "sourceRevision": 48590,
+    "sourceHash": "6b768e4f45b4092d040f7576d6fb799d8b66b45ae29a0902c37334fb7c5c6816",
+    "contractHash": "e5a497cefe8e0e350a30da5cc04e88b35c38a98535893d52f878890260d1346d",
+    "runtimes": [
+      {
+        "platform": "linux",
+        "approvedArtifact": "cosmemilton-acbr-node-linux-x64-0.1.1.tgz",
+        "approvedArtifactSha256": "860c0efaf6c58c8af0ace2c3577abf8d5738a0a05399a7376505de51513b1202",
+        "workerSha256": "5cf11071f8b06e5ee05dd9ef114a9b7f7060949e5a0836728390b4ae4a67db68",
+        "runtimeFiles": 251,
+        "runtimeManifestSha256": "30cc2a9acf9e7882070a0bba33d3ccd0ff2f406b148f4377e480ccce2f415417",
+        "nativeSourcesUnchanged": true,
+        "allLicensesSourcesHashesAudited": true,
+        "runtimeManifestAndBinariesUnchanged": true
+      },
+      {
+        "platform": "win32",
+        "approvedArtifact": "cosmemilton-acbr-node-win32-x64-0.1.1.tgz",
+        "approvedArtifactSha256": "25577ba3007871191b7f0cb2f5d1346e1cbac7f7f47b06549df0d9a6784f809d",
+        "workerSha256": "48d104bf06776f4f8e8c68257f9b7b29ad84dd3df8a48d8776a66d78e5b18bce",
+        "runtimeFiles": 241,
+        "runtimeManifestSha256": "0642792f0588b070e83cfe785355d50f97830ad5177efd9b5da287737baa8f85",
+        "nativeSourcesUnchanged": true,
+        "allLicensesSourcesHashesAudited": true,
+        "runtimeManifestAndBinariesUnchanged": true
+      }
+    ]
+  },
+  "networkTransmission": false,
+  "publicationTransport": {
+    "type": "reviewed-https-bundle",
+    "status": "pending-public-assets"
+  },
+  "publicationAuthorizedOn": "2026-10-12",
+  "artifacts": [
+    {
+      "file": "cosmemilton-acbr-node-linux-x64-0.1.2.tgz",
+      "bytes": 51569703,
+      "sha256": "e27348cd284a7f7de5276dd6ce90ae7c0bfdb6257685cec115fead36b9592e4e"
+    },
+    {
+      "file": "cosmemilton-acbr-node-win32-x64-0.1.2.tgz",
+      "bytes": 33668399,
+      "sha256": "74755ff9cb5aac29191938ca833226b485c4fddb9086b2b490da1b3575179586"
+    },
+    {
+      "file": "cosmemilton-acbr-node-0.1.2.tgz",
+      "bytes": 671320,
+      "sha256": "2fbcfe6f50037adf6e25e0e61ebf2e4900936baf29e663d47eb1fccb3ad2d4af"
+    }
+  ]
+}
