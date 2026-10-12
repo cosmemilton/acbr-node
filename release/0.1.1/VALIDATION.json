@@ -75,8 +75,55 @@
     "linuxNpmCliSymlink": "passed",
     "tarballAudit": "passed",
     "npmDryRun": "passed",
-    "pullRequestCi": "pending",
-    "minimumNode": "awaiting pull-request CI"
+    "pullRequestCi": {
+      "status": "passed",
+      "workflow": "Validate SDK pull request",
+      "trigger": "push",
+      "sourceCommit": "d8943eed9f0e38792aedfee313b0084364d32548",
+      "runId": 38247646775,
+      "url": "https://github.com/cosmemilton/acbr-node/actions/runs/38247646775",
+      "jobs": [
+        {
+          "name": "ubuntu-24.04 / Node 22.12.0",
+          "passed": 95,
+          "failed": 0,
+          "skipped": 5
+        },
+        {
+          "name": "ubuntu-24.04 / Node 24",
+          "passed": 95,
+          "failed": 0,
+          "skipped": 5
+        },
+        {
+          "name": "windows-latest / Node 22.12.0",
+          "passed": 95,
+          "failed": 0,
+          "skipped": 5
+        },
+        {
+          "name": "windows-latest / Node 24",
+          "passed": 95,
+          "failed": 0,
+          "skipped": 5
+        }
+      ]
+    },
+    "minimumNode": "22.12.0: typecheck, build and SDK tests passed on Linux and Windows",
+    "installedDiagnosticsApi": {
+      "windows": {
+        "passed": 62,
+        "failed": 0,
+        "motorSpawns": 0,
+        "node": "v24.18.0"
+      },
+      "linux": {
+        "passed": 62,
+        "failed": 0,
+        "motorSpawns": 0,
+        "node": "v24.15.0"
+      }
+    }
   },
   "nativeReuse": {
     "reusedNativeBytes": true,
