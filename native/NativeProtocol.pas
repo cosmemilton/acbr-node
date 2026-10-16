@@ -47,7 +47,7 @@ begin
  OnlyKeys(O,'|versao|id|comando|sourceRevision|contractHash|config|documento|xmlBase64|chave|recibo|protocolo|justificativa|correcao|sequenciaEvento|inutilizacao|');
  if(Inteiro(O,'versao')<>1)or(Inteiro(O,'sourceRevision')<>SourceRevision)or(Texto(O,'contractHash')<>ContractHash)then Falhar('CONTRATO_INCOMPATIVEL','Contrato ou revisão ACBr incompatível.');
  S:=Texto(O,'id');if Length(S)>100 then Falhar('REQUISICAO_INVALIDA','Identificador inválido.');for I:=1 to Length(S)do if not(S[I]in['A'..'Z','a'..'z','0'..'9','_','-'])then Falhar('REQUISICAO_INVALIDA','Identificador inválido.');
- Cmd:=Texto(O,'comando');if Pos('|'+Cmd+'|','|gerarXml|validar|assinar|transmitir|consultar|cancelar|cartaCorrecao|inutilizar|')=0 then Falhar('REQUISICAO_INVALIDA','Comando fiscal inválido.');
+ Cmd:=Texto(O,'comando');if Pos('|'+Cmd+'|','|gerarXml|validar|assinar|transmitir|consultar|recuperarXml|cancelar|cartaCorrecao|inutilizar|')=0 then Falhar('REQUISICAO_INVALIDA','Comando fiscal inválido.');
  C:=Objeto(O,'config');OnlyKeys(C,'|cnpj|uf|modelo|ambiente|certificado|csc|');
  S:=Texto(C,'cnpj');if Length(S)<>14 then Falhar('REQUISICAO_INVALIDA','CNPJ inválido.');for I:=1 to Length(S)do if not(S[I]in['0'..'9'])then Falhar('REQUISICAO_INVALIDA','CNPJ inválido.');
  if not(Inteiro(C,'modelo')in[55,65])or not(Inteiro(C,'ambiente')in[1,2])then Falhar('REQUISICAO_INVALIDA','Modelo ou ambiente inválido.');
@@ -56,7 +56,8 @@ begin
  if C.Find('csc')<>nil then begin Cert:=Objeto(C,'csc');OnlyKeys(Cert,'|id|valor|');S:=Texto(Cert,'id');if Length(S)>6 then Falhar('REQUISICAO_INVALIDA','CSC inválido.');for I:=1 to Length(S)do if not(S[I]in['0'..'9'])then Falhar('REQUISICAO_INVALIDA','CSC inválido.');if Length(Texto(Cert,'valor'))>256 then Falhar('REQUISICAO_INVALIDA','CSC inválido.');end;
  if(Cmd='cartaCorrecao')and(Inteiro(C,'modelo')<>55)then Falhar('REQUISICAO_INVALIDA','Carta de correção restrita à NF-e.');
  if(Cmd='gerarXml')and(O.Find('documento')=nil)then Falhar('REQUISICAO_INVALIDA','Documento obrigatório para gerar XML.');
- if(Pos('|'+Cmd+'|','|validar|assinar|transmitir|')>0)and(O.Find('xmlBase64')=nil)then Falhar('REQUISICAO_INVALIDA','XML obrigatório.');
+ if(Pos('|'+Cmd+'|','|validar|assinar|transmitir|recuperarXml|')>0)and(O.Find('xmlBase64')=nil)then Falhar('REQUISICAO_INVALIDA','XML obrigatório.');
+ if(Cmd='recuperarXml')and((O.Find('chave')<>nil)or(O.Find('recibo')<>nil)or(O.Find('protocolo')<>nil)or(O.Find('documento')<>nil)or(O.Find('inutilizacao')<>nil)or(O.Find('justificativa')<>nil)or(O.Find('correcao')<>nil)or(O.Find('sequenciaEvento')<>nil))then Falhar('REQUISICAO_INVALIDA','Recuperacao recebe somente o XML original assinado.');
 end;
 procedure MarcadorEnvio(const Id:string);
 var O:TJSONObject;

@@ -2,7 +2,7 @@
 
 ## Help de tipos e campos — implementação de desenvolvimento
 
-O help TAG faz parte da release 0.1.2. A documentação pública só anuncia disponibilidade após a confirmação dessa versão no registry npm.
+O help TAG foi introduzido na release 0.1.2 e permanece na 0.2.0 descrita nesta documentação. A disponibilidade da 0.2.0 no npm só é anunciada após a confirmação dessa versão no registry.
 
 ```sh
 node dist/cli.js help TAG Ide.tpNF

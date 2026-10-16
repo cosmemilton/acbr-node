@@ -2,6 +2,13 @@ import { ErroAcbrNode, type Comando, type DetalhesErroAcbr, type DiagnosticoAcbr
 
 const ETAPAS = new Set<EtapaAcbr>(['configuracao','documento','runtime','geracao','validacao','assinatura','transmissao','consulta','cancelamento','carta_correcao','inutilizacao','operacao','limpeza']);
 const CAMPOS = new Set(['cnpj','uf','modelo','ambiente','contrato','certificado','certificado.senha','certificado.pfx','certificado.arquivo','csc','csc.id','csc.valor','timeoutMs','limiteFila','limiteBytes','runtimeDirectory','documento','xml','consulta','chave','recibo','cancelamento','protocolo','justificativa','cartaCorrecao','correcao','sequenciaEvento','inutilizacao','ano','serie','numeroInicial','numeroFinal','operacao','signal']);
+const MAX_RECOVERED_XML_BYTES = 4 * 1024 * 1024;
+/** Limite do envelope recuperado; a entrada assinada mantém seu limite de 2 MiB. */
+export function base64XmlRecuperadoValido(value: unknown): value is string {
+  if(typeof value!=='string'||value.length===0||value.length>Math.ceil(MAX_RECOVERED_XML_BYTES/3)*4)return false;
+  const bytes=Buffer.from(value,'base64');
+  return bytes.length>0&&bytes.length<=MAX_RECOVERED_XML_BYTES&&bytes.toString('base64')===value;
+}
 const CATALOGO: Record<string, [EtapaAcbr, string, string]> = {
   CONFIGURACAO_INVALIDA: ['configuracao','A configuração contém um campo inválido.','Confira o campo indicado e seu tipo antes de continuar.'],
   CONTRATO_INVALIDO: ['configuracao','O contrato do cliente é inválido.','Use o contrato gerado junto com o cliente.'],
@@ -17,6 +24,7 @@ const CATALOGO: Record<string, [EtapaAcbr, string, string]> = {
   XML_NAO_ASSINADO: ['assinatura','A operação exige XML previamente assinado.','Conclua a assinatura e a validação antes de transmitir.'],
   XML_ALTERADO: ['assinatura','O XML assinado foi alterado.','Use exatamente o XML assinado e persistido; não edite seu conteúdo.'],
   RETORNO_INVALIDO: ['transmissao','A identidade ou o protocolo do retorno fiscal é inválido.','Consulte a situação fiscal antes de decidir repetir a operação.'],
+  RECUPERACAO_NAO_COMPROVADA: ['consulta','A consulta não comprovou a recuperação do XML autorizado.','Preserve o XML assinado original e confira a situação fiscal. Não transmita a nota para tentar recuperar o protocolo.'],
   OPERACAO_FISCAL_FALHOU: ['operacao','O motor não conseguiu concluir a etapa fiscal.','Confira a configuração da etapa, os dados do XML e as dependências do runtime.'],
   TLS_SERVIDOR_INVALIDO: ['transmissao','A verificação TLS do serviço fiscal falhou.','Confira o serviço e a cadeia de confiança; mantenha a verificação TLS habilitada.'],
   CSC_INVALIDO: ['configuracao','A configuração do CSC é inválida.','Confira id e valor do CSC sem registrar seu conteúdo.'],
@@ -25,6 +33,7 @@ const CATALOGO: Record<string, [EtapaAcbr, string, string]> = {
   RUNTIME_INVALIDO: ['runtime','O runtime fiscal é inválido.','Use um runtime distribuído e compatível com a plataforma.'],
   RUNTIME_INCOMPLETO: ['runtime','Falta um arquivo do runtime fiscal.','Reinstale o runtime da plataforma.'],
   RUNTIME_ALTERADO: ['runtime','A integridade do runtime fiscal não foi confirmada.','Reinstale o runtime; não desative a verificação dos hashes.'],
+  RUNTIME_SEM_CAPACIDADE: ['runtime','O runtime instalado não oferece esta operação.','Atualize o pacote principal e o runtime da plataforma para versões compatíveis com a operação solicitada.'],
   CONTRATO_DIVERGENTE: ['runtime','Cliente e motor usam contratos diferentes.','Use versões compatíveis ou regenere e recompile ambos.'],
   DOCUMENTO_INVALIDO: ['documento','O documento contém dados incompatíveis com o modelo.','Valide os campos e tipos do documento antes de gerar o XML.'],
   OPERACAO_INVALIDA: ['operacao','Os parâmetros da operação são inválidos.','Informe um objeto com os campos exigidos pela operação.'],
@@ -52,7 +61,7 @@ const CATALOGO: Record<string, [EtapaAcbr, string, string]> = {
 };
 
 export function etapaDaOperacao(comando: Comando): EtapaAcbr {
-  return ({gerarXml:'geracao',validar:'validacao',assinar:'assinatura',transmitir:'transmissao',consultar:'consulta',cancelar:'cancelamento',cartaCorrecao:'carta_correcao',inutilizar:'inutilizacao'} as const)[comando]??'operacao';
+  return ({gerarXml:'geracao',validar:'validacao',assinar:'assinatura',transmitir:'transmissao',consultar:'consulta',recuperarXml:'consulta',cancelar:'cancelamento',cartaCorrecao:'carta_correcao',inutilizar:'inutilizacao'} as const)[comando]??'operacao';
 }
 
 /** Apenas catálogo e metadados conhecidos; nunca copia message, stack, stderr ou causa bruta. */
@@ -94,14 +103,20 @@ export function diagnosticarResultado(resultado: ResultadoFiscal, comando: Coman
   const protocolo=typeof resultado.protocolo==='string'&&/^\d{15}$/.test(resultado.protocolo);
   const chave=typeof resultado.chave==='string'&&/^\d{44}$/.test(resultado.chave);
   const autorizacao=(comando==='transmitir'||comando==='consultar')&&resultado.estado==='AUTORIZADO'&&[100,150].includes(resultado.cStat!)&&protocolo&&chave&&(comando==='consultar'||resultado.envioIniciado!==false);
+  const xmlRecuperado=comando==='recuperarXml'&&base64XmlRecuperadoValido(resultado.xmlBase64);
+  const recuperacao=comando==='recuperarXml'&&resultado.estado==='XML_RECUPERADO'&&resultado.cStat===100&&protocolo&&chave&&semEvento&&xmlRecuperado;
   const evento=(comando==='cancelar'&&resultado.estado==='CANCELADO'&&[135,136].includes(resultado.cStat!)&&chave)||(comando==='cartaCorrecao'&&resultado.estado==='EVENTO_REGISTRADO'&&resultado.cStat===135&&chave)||(comando==='inutilizar'&&resultado.estado==='INUTILIZADO'&&resultado.cStat===102);
   if (local && resultado.sucesso===true && semEvento) {
     statusEnvio='nao_enviado';codigo='ETAPA_LOCAL_CONCLUIDA';mensagem='A etapa local foi concluída; esta operação não transmitiu a nota.';acao='Confira o resultado antes de seguir para a próxima etapa.';
+  } else if (resultado.sucesso===true && recuperacao) {
+    statusEnvio='autorizado';codigo='XML_RECUPERADO';mensagem='O XML autorizado foi recuperado por consulta; esta operação não transmitiu a nota.';acao='Guarde o XML recuperado com o protocolo de autorização.';
+  } else if (comando==='recuperarXml'&&resultado.sucesso===false&&resultado.codigo==='RECUPERACAO_NAO_COMPROVADA'&&['CONSULTADO','ERRO'].includes(resultado.estado)&&semEvento) {
+    statusEnvio='nao_enviado';codigo='RECUPERACAO_NAO_COMPROVADA';mensagem=CATALOGO.RECUPERACAO_NAO_COMPROVADA[1];acao=CATALOGO.RECUPERACAO_NAO_COMPROVADA[2];
   } else if (resultado.sucesso===true && (autorizacao||evento&&protocolo&&resultado.envioIniciado!==false)) {
     statusEnvio='autorizado';codigo='OPERACAO_CONFIRMADA';
     mensagem=({AUTORIZADO:'A nota foi autorizada.',CANCELADO:'O cancelamento foi confirmado.',EVENTO_REGISTRADO:'O evento foi registrado.',INUTILIZADO:'A faixa foi inutilizada.'} as Record<string,string>)[resultado.estado];
     acao='Guarde o resultado fiscal. Não repita esta operação.';
-  } else if (resultado.sucesso===false && (comando==='consultar'||resultado.envioIniciado!==false) && ['transmitir','consultar','cancelar','cartaCorrecao','inutilizar'].includes(comando) && Number.isInteger(resultado.cStat) && Number(resultado.cStat)>0 && Number(resultado.cStat)<=9999 && (resultado.estado==='DENEGADO'&&[110,301,302].includes(resultado.cStat!)||resultado.estado==='REJEITADO'&&![100,150,110,301,302,101,151,155,103,104,105,108,109,204,539,573,135,136,102,217].includes(resultado.cStat!))) {
+  } else if (resultado.sucesso===false && (comando==='consultar'||comando==='recuperarXml'||resultado.envioIniciado!==false) && ['transmitir','consultar','recuperarXml','cancelar','cartaCorrecao','inutilizar'].includes(comando) && Number.isInteger(resultado.cStat) && Number(resultado.cStat)>0 && Number(resultado.cStat)<=9999 && (resultado.estado==='DENEGADO'&&[110,301,302].includes(resultado.cStat!)||resultado.estado==='REJEITADO'&&![100,150,110,301,302,101,151,155,103,104,105,108,109,204,539,573,135,136,102,217].includes(resultado.cStat!))) {
     statusEnvio='rejeitado';codigo=resultado.estado==='DENEGADO'?'NOTA_DENEGADA':'OPERACAO_REJEITADA';
     mensagem=resultado.estado==='DENEGADO'?'A nota foi denegada.':'A operação foi rejeitada.';
     acao=resultado.estado==='DENEGADO'?'Consulte a situação fiscal e a orientação responsável antes de usar a numeração.':'Confira o cStat e revise os dados antes de decidir uma nova tentativa.';

@@ -20,6 +20,7 @@ quando o emissor foi fechado ou o encerramento do motor não foi confirmado.
 | `gerarXml` | Objeto TNFe/TNFeInput com nomes ACBr |
 | `assinar`, `validar`, `transmitir` | XML UTF-8 como string |
 | `consultar` | `{ chave, recibo? }` |
+| `recuperarXml` | XML UTF-8 de uma única NFe 4.00 já assinada; faz uma consulta externa pela chave do XML |
 | `cancelar` | `{ chave, protocolo, justificativa }` |
 | `cartaCorrecao` | `{ chave, correcao, sequenciaEvento? }`; modelo 55 |
 | `inutilizar` | `{ ano, serie, numeroInicial, numeroFinal, justificativa }`; ano com 2 dígitos |
@@ -27,6 +28,31 @@ quando o emissor foi fechado ou o encerramento do motor não foi confirmado.
 A resposta `ResultadoFiscal` contém `sucesso`, `estado`, revisão/hash do contrato e, quando disponíveis, `cStat`, `xMotivo`, `chave`, `protocolo`, `recibo` e `xmlBase64`. `sucesso` deve ser conferido antes de usar o resultado. XML é devolvido em base64 para preservar os bytes UTF-8.
 
 Rejeições fiscais e recibos pendentes são resultados, sem retry automático. Falhas no supervisor lançam `ErroAcbrNode` com `codigo` e `resultadoDesconhecido`. Em falha/timeout de uma operação que pode ter iniciado envio, consulte a situação fiscal antes de decidir uma nova transmissão. O erro de transmissão conserva `xmlBase64` para recuperação.
+
+## Consulta e recuperação do XML
+
+As duas operações têm contratos distintos e não compartilham uma coleção nativa de notas entre chamadas:
+
+| Operação | Entrada e saída |
+| --- | --- |
+| `consultar({ chave })` | Consulta a situação. `xmlBase64`, quando presente, contém o retorno do serviço (`retConsSitNFe`), não o arquivo original da NFe. O comportamento anterior permanece disponível. |
+| `recuperarXml(xmlAssinado, opcoes?)` | Recebe o original assinado e retorna `Promise<ResultadoFiscal>`. Usa uma nova consulta para obter o protocolo e devolver o `nfeProc` completo, somente quando a recuperação foi comprovada. |
+
+O segundo argumento, `opcoes?: OpcoesOperacao`, é opcional: pode ser omitido, como em `emissor.recuperarXml(xmlAssinado)`. `OpcoesOperacao` aceita somente `signal?: AbortSignal`. Para permitir um pedido de cancelamento, passe `{ signal: controlador.signal }`, obtido de um `AbortController`, e chame `controlador.abort()` quando necessário. O sinal solicita o cancelamento da operação do SDK; não cancela a autorização fiscal. A consulta pode já ter sido enviada quando o sinal é acionado.
+
+A operação exige A1 para a consulta e XML de uma única NFe 4.00, sem envelope, DTD ou entidades externas. A chave é derivada do documento, não de um parâmetro separado. O motor valida o schema e a assinatura da NFe de entrada antes da consulta e confere emitente, UF, modelo e ambiente contra a configuração do emissor.
+
+O sucesso exige cumulativamente `sucesso=true`, `estado='XML_RECUPERADO'`, `cStat=100` e `xmlBase64` contendo o processo completo. O protocolo deve ter 15 dígitos, pertencer à mesma chave e ambiente e vir da resposta desta consulta. O `digVal` do protocolo é obrigatório e precisa ser exatamente igual ao `DigestValue` da referência assinada da NFe verificada; a comparação de base64 diferencia maiúsculas de minúsculas. O motor preserva o corpo da NFe e sua assinatura original, compõe com o protocolo recebido, valida o schema do processo resultante e verifica novamente a assinatura da NFe. Não reconstrói um protocolo a partir apenas dos campos escalares.
+
+Na versão 0.2.0, um `protNFe` com assinatura XMLDSig (`ds:Signature`) é recusado com `RECUPERACAO_NAO_COMPROVADA`, sem `xmlBase64` ou `protocolo`, independentemente da validade dessa assinatura e mesmo quando o status é `100`. O verificador disponível nesta versão não comprova de forma independente essa assinatura adicional da SEFAZ; mudanças no contexto de namespaces do envelope também podem afetar a canonicalização. A operação não oferece preservação ou verificação de uma assinatura do protocolo. A assinatura original da NFe é preservada e verificada antes e depois da composição. Os protocolos aceitos mantêm os dados da resposta real e exigem a correlação por `digVal` descrita acima.
+
+Para status diferente de `100`, inclusive `150` e `217`, a nova operação devolve `sucesso=false`, estado `CONSULTADO`, código `RECUPERACAO_NAO_COMPROVADA` e o `cStat`/motivo recebido, sem `protocolo` ou `xmlBase64` de recuperação. Uma resposta `100` incompleta ou divergente também falha, sem XML ou protocolo, com o diagnóstico correspondente: divergências de chave, ambiente ou digest usam `IDENTIDADE_DIVERGENTE`; falhas de schema usam `XML_SCHEMA_INVALIDO`. Isso não altera os estados e resultados de `consultar`, inclusive seu tratamento anterior de `150`. O diagnóstico sanitizado de uma recuperação concluída usa `XML_RECUPERADO` e explica que a autorização foi consultada, sem nova transmissão.
+
+Essa consulta é uma operação de rede. `envioIniciado=false` informa que não se iniciou transmissão de nota ou evento; não informa que a operação foi offline. A recuperação não chama `assinar`, `transmitir`, eventos ou inutilização, não tenta emitir novamente e não persiste nem substitui arquivos fiscais. A aplicação decide onde salvar os bytes devolvidos e deve preservar o arquivo assinado original. O exemplo em [examples/recuperar-xml.mjs](examples/recuperar-xml.mjs) deixa essa gravação para o chamador e não inicia consulta ao ser importado.
+
+Atualize SDK e runtime da plataforma em conjunto. Para essa operação, o manifesto precisa incluir `capabilities: ['recuperarXml']`, além dos demais campos e hashes. Um motor sem essa capacidade é recusado com `RUNTIME_SEM_CAPACIDADE` antes de iniciar o processo; não basta reaproveitar um binário antigo com o mesmo contrato dos modelos. A adição mantém a versão 1 do protocolo JSONL e não muda `consultar`.
+
+`validar(xml)` continua recebendo uma NFe sem envelope. Para verificar um `nfeProc` recebido ou salvo pela aplicação, use seu schema de processo (`procNFe_v4.00.xsd`), não `validar(nfeProc)`. Na recuperação, a validação do processo e a conferência da assinatura original da NFe já são responsabilidade do motor, com a limitação sobre assinatura adicional do protocolo descrita acima.
 
 ## Feedback seguro para o usuário
 

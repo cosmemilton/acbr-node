@@ -9,6 +9,7 @@ export interface BuiltRuntimeManifest {
   formatVersion: 1; sourceRevision: number; contractHash: string; platform: string; arch: string;
   executable: string; files: Record<string, string>;
   systemDependencies?: string[]; testOnly?: boolean; generatedFileHashes: Record<string, string>;
+  capabilities?: string[];
 }
 interface GeneratedManifest { sourceRevision: number; sourceHash: string; contractHash: string; fileHashes: Record<string, string>; }
 export function runtimeDirectory(config: AcbrConfig): string { return join(config.native.outputDir, `${process.platform}-${process.arch}`); }
@@ -190,7 +191,7 @@ export async function buildNative(config: AcbrConfig, options: { testOnly?: bool
     if (currentSource.source.revision !== lock.source.revision || currentSource.source.treeHash !== lock.source.treeHash) throw new Error('Fontes ACBr foram atualizadas durante a compilação. Execute generate e build novamente.');
     const files = (await snapshotSource(stage)).files;
     const manifest: BuiltRuntimeManifest = { formatVersion: 1, sourceRevision: lock.source.revision, contractHash: contract.contractHash,
-      platform: process.platform, arch: process.arch, executable, files, generatedFileHashes: contract.fileHashes, systemDependencies, ...(options.testOnly ? { testOnly: true } : {}) };
+      platform: process.platform, arch: process.arch, executable, files, generatedFileHashes: contract.fileHashes, capabilities: ['recuperarXml'], systemDependencies, ...(options.testOnly ? { testOnly: true } : {}) };
     await writeFile(join(stage, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
     await replaceRuntime(stage, target);
     return manifest;
@@ -227,6 +228,7 @@ export async function checkBuild(config: AcbrConfig): Promise<BuiltRuntimeManife
   if (manifest.formatVersion !== 1 || manifest.platform !== process.platform || manifest.arch !== process.arch ||
       manifest.sourceRevision !== lock.source.revision || generated.sourceHash !== lock.source.treeHash || manifest.contractHash !== generated.contractHash ||
       !manifest.generatedFileHashes || Object.entries(generated.fileHashes).some(([name, hash]) => manifest.generatedFileHashes[name] !== hash) ||
+      !Array.isArray(manifest.capabilities) || !manifest.capabilities.includes('recuperarXml') ||
       typeof manifest.executable !== 'string' || !manifest.files || !Object.hasOwn(manifest.files, manifest.executable)) throw new Error('Runtime diverge das fontes ou contrato. Execute build.');
   for (const [path, expected] of Object.entries(manifest.files)) {
     if (path.startsWith('/') || path.includes('\\') || path.split('/').includes('..') || !/^[a-f0-9]{64}$/.test(expected)) throw new Error(`Caminho/hash inválido no runtime: ${path}.`);

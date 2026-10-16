@@ -1,5 +1,9 @@
 // Every key, certificate and document is synthetic. No fixture may be transmitted.
 import forge from 'node-forge';
+import {mkdir,readdir,writeFile}from'node:fs/promises';
+import {spawn,execFile}from'node:child_process';
+import {promisify}from'node:util';
+import path from'node:path';
 export const CNPJ='11222333000181';
 export const PASSWORD=' acbr-node-synthetic-offline ';
 let keyPair;
@@ -45,4 +49,98 @@ export function objetoDocumento(modelo=55){
   Det:[{Prod:{nItem:1,cProd:'TESTE',cEAN:'SEM GTIN',xProd:'Café São José PRODUTO SINTÉTICO OFFLINE',NCM:'22021000',CFOP:'5102',uCom:'UN',qCom:'1',vUnCom:'10',vProd:'10',cEANTrib:'SEM GTIN',uTrib:'UN',qTrib:'1',vUnTrib:'10',IndTot:'itSomaTotalNFe'},Imposto:{ICMS:{orig:'oeNacional',CSOSN:'csosn102'},PIS:{CST:'pis07'},COFINS:{CST:'cof07'}}}],
   Total:{ICMSTot:{vProd:'10',vNF:'10'}},Transp:{modFrete:'mfSemFrete'},pag:[{tPag:'fpDinheiro',indPag:'ipVista',vPag:'10'}]
  };
+}
+
+// Recovery fixtures remain synthetic and are served only by the localhost SOAP mock.
+export function partesAssinadas(xmlBase64){
+ const xml=Buffer.from(xmlBase64,'base64').toString('utf8');
+ const nfe=xml.match(/<(?:[A-Za-z_][\w.-]*:)?NFe\b[\s\S]*?<\/(?:[A-Za-z_][\w.-]*:)?NFe>/)?.[0];
+ const assinatura=xml.match(/<(?:[A-Za-z_][\w.-]*:)?Signature(?:\s|>)[\s\S]*?<\/(?:[A-Za-z_][\w.-]*:)?Signature>/)?.[0];
+ const digest=xml.match(/<(?:[A-Za-z_][\w.-]*:)?DigestValue>([^<]+)<\/(?:[A-Za-z_][\w.-]*:)?DigestValue>/)?.[1];
+ if(!nfe||!assinatura||!digest)throw new Error('Synthetic signed fixture is incomplete');
+ return{xml,nfe,assinatura,digest};
+}
+
+export function comAspasSimples(xmlBase64){
+ const xml=Buffer.from(xmlBase64,'base64').toString('utf8');
+ // Delimiters do not change the XML infoset or canonical signature input.
+ return Buffer.from(xml.replace(/="([^"]*)"/g,(attribute,value)=>value.includes("'")?attribute:"='"+value+"'")).toString('base64');
+}
+
+export function comComplemento(fixture,texto){
+ const xml=Buffer.from(fixture.xmlBase64,'base64').toString('utf8');
+ if(!/<infCpl>[\s\S]*?<\/infCpl>/.test(xml))throw new Error('Synthetic infCpl fixture is absent');
+ const escaped=texto.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
+ return{chave:fixture.chave,xmlBase64:Buffer.from(xml.replace(/<infCpl>[\s\S]*?<\/infCpl>/,()=>'<infCpl>'+escaped+'</infCpl>')).toString('base64')};
+}
+
+export function comPrefixo(fixture,prefixo='n'){
+ if(!/^[A-Za-z_][\w.-]*$/.test(prefixo))throw new Error('Invalid synthetic namespace prefix');
+ // The low-level ACBr signer removes line breaks after signing. Compact only
+ // this unsigned fixture beforehand, so no signed content is ever changed.
+ const xml=Buffer.from(fixture.xmlBase64,'base64').toString('utf8')
+  .replace(/>\r?\n[ \t]*(?=<)/g,'>');
+ if(/<(?:[A-Za-z_][\w.-]*:)?Signature(?:\s|>)/.test(xml))throw new Error('Prefix fixture must be unsigned');
+ const namespace='http://www.portalfiscal.inf.br/nfe';
+ if(!xml.includes('xmlns="'+namespace+'"'))throw new Error('Synthetic default namespace absent');
+ const prefixed=xml.replace('xmlns="'+namespace+'"','xmlns:'+prefixo+'="'+namespace+'"')
+  .replace(/<(\/?)([A-Za-z_][\w.-]*)(?=[\s/>])/g,(_tag,close,name)=>'<'+close+prefixo+':'+name);
+ return{chave:fixture.chave,xmlBase64:Buffer.from(prefixed).toString('base64')};
+}
+
+// Same free-toolchain approach as the TLS probe. The harness signs only inputs
+// created by these tests; synthetic PFX/password always travel through stdin.
+export async function criarAssinadorSintetico({root,runtime}){
+ const source=path.join(process.env.ACBR_NODE_SOURCE_DIR??path.join(root,'.acbr','source'),'Fontes');
+ const directories=async folder=>{
+  const result=[folder];
+  for(const entry of(await readdir(folder,{withFileTypes:true})).sort((a,b)=>a.name.localeCompare(b.name)))
+   if(entry.isDirectory())result.push(...await directories(path.join(folder,entry.name)));
+  return result;
+ };
+ const fonts=await directories(source),target=process.platform==='win32'?'x86_64-win64':'x86_64-linux';
+ const out=path.join(root,'.acbr','recovery-sign-test',process.platform+'-'+process.arch);await mkdir(out,{recursive:true});
+ const lazarus=process.env.ACBR_NODE_LAZARUS_ROOT??process.env.LAZARUS_ROOT??(process.platform==='linux'?'/usr/lib/lazarus/3.0':'');
+ const includes=[path.join(root,'native'),...fonts];
+ if(lazarus)includes.push(path.join(lazarus,'components','lazutils','lib',target),path.join(lazarus,'lcl','units',target),
+  path.join(lazarus,'lcl','units',target,'nogui'),path.join(lazarus,'packager','units',target));
+ const executable=path.join(out,process.platform==='win32'?'native-recovery-sign.exe':'native-recovery-sign');
+ const flags=['-vew','-Mdelphi','-Scghi','-O1','-g-','-dNOGUI','-dNOREPORT',...includes.map(p=>'-Fu'+p),
+  ...fonts.map(p=>'-Fi'+p),'-FU'+out,'-FE'+out,'-o'+executable];
+ if(flags.some(flag=>/["\r\n]/.test(flag)))throw new Error('Invalid recovery fixture compiler path');
+ const responseFile=path.join(out,'compiler.rsp');await writeFile(responseFile,flags.join('\n')+'\n');
+ await promisify(execFile)(process.env.ACBR_NODE_FPC??'fpc',['@'+responseFile,path.join(root,'test','native-recovery-sign.lpr')],
+  {cwd:root,timeout:120000,maxBuffer:4*1024*1024,windowsHide:true});
+ const env={...process.env,OPENSSL_CONF:path.join(runtime,'openssl.cnf'),OPENSSL_MODULES:path.join(runtime,'ossl-modules')};
+ if(process.platform==='linux')env.LD_LIBRARY_PATH=path.join(runtime,'lib');
+ else env.PATH=path.join(runtime,'lib')+path.delimiter+(process.env.PATH??'');
+ return input=>new Promise((resolve,reject)=>{
+  const child=spawn(executable,[],{cwd:runtime,env,windowsHide:true,shell:false,stdio:['pipe','pipe','pipe']});
+  const chunks=[];let size=0;
+  const timer=setTimeout(()=>{child.kill('SIGKILL');reject(new Error('Synthetic signer timeout'));},15000);
+  child.on('error',error=>{clearTimeout(timer);reject(error);});
+  child.stdout.on('data',chunk=>{size+=chunk.length;if(size>8*1024*1024){child.kill('SIGKILL');reject(new Error('Synthetic signer output limit'));return;}chunks.push(chunk);});
+  child.stderr.on('data',()=>{});
+  child.on('close',code=>{clearTimeout(timer);if(code!==0){reject(new Error('Synthetic signer exit '+code));return;}
+   try{resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')));}catch(error){reject(error);}});
+  child.stdin.on('error',error=>{if(error.code!=='EPIPE'){clearTimeout(timer);reject(error);}});
+  child.stdin.end(JSON.stringify(input)+'\n');
+ });
+}
+
+export function respostaConsulta({chave,digest,cStat=100,ambiente=2,cUF=23,incluirProtocolo=true,
+ protocolo='123456789012345',chaveRetorno=chave,chaveProtocolo=chave,ambienteProtocolo=ambiente,
+ statusProtocolo=cStat,prefixo='',namespace='http://www.portalfiscal.inf.br/nfe'}={}){
+ const name=tag=>prefixo?prefixo+':'+tag:tag;
+ const tag=(key,value)=>'<'+name(key)+'>'+value+'</'+name(key)+'>';
+ const received=new Date().toISOString().replace(/\.\d{3}Z$/,'-00:00');
+ const protocol=incluirProtocolo?'<'+name('protNFe')+' versao="4.00"><'+name('infProt')+'>'
+  +tag('tpAmb',ambienteProtocolo)+tag('verAplic','SYNTHETIC')+tag('chNFe',chaveProtocolo)
+  +tag('dhRecbto',received)+(protocolo===null?'':tag('nProt',protocolo))
+  +(digest===undefined?'':tag('digVal',digest))+tag('cStat',statusProtocolo)
+  +tag('xMotivo',"RESPOSTA D'EXEMPLO SINTETICO")+'</'+name('infProt')+'></'+name('protNFe')+'>':'';
+ return'<'+name('retConsSitNFe')+' xmlns'+(prefixo?':'+prefixo:'')+'="'+namespace+'" versao="4.00">'
+  +tag('tpAmb',ambiente)+tag('verAplic','SYNTHETIC')+tag('cStat',cStat)
+  +tag('xMotivo','RESPOSTA SINTETICA LOCAL')+tag('cUF',cUF)+tag('dhRecbto',received)
+  +tag('chNFe',chaveRetorno)+protocol+'</'+name('retConsSitNFe')+'>';
 }

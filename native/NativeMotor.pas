@@ -6,7 +6,7 @@ procedure Executar(Q,R:TJSONObject);
 implementation
 uses Classes,SysUtils,DateUtils,base64,ACBrNFe,ACBrDFeSSL,ACBrNFeNotasFiscais,
  ACBrDFe.Conversao,pcnConversao,pcnConversaoNFe,ACBrUtil.Strings,
- AcbrModels,NativeProtocol,NativeTLS,OpenSSLExt,ACBrDFeComum.RetEnvio,ACBrNFe.RetInut;
+ AcbrModels,NativeProtocol,NativeTLS,NativeRecovery,OpenSSLExt,ACBrDFeComum.RetEnvio,ACBrNFe.RetInut;
 procedure Estado(R:TJSONObject;const S:string);
 begin R.Strings['estado']:=S;R.Booleans['sucesso']:=not(S='ERRO')and not(S='REJEITADO')and not(S='PENDENTE')and not(S='INDETERMINADO')and not(S='DENEGADO');end;
 procedure ChaveValida(const Key:string;C:TJSONObject;M:TACBrNFe);
@@ -66,10 +66,26 @@ begin
  end;
 end;
 procedure CarregarXML(M:TACBrNFe;Q,C:TJSONObject;out XML:string);
+var OriginalKey,OriginalDocument,OriginalDigest:string;
 begin
  XML:=Decodificar(Texto(Q,'xmlBase64'),4*1024*1024);
  if(Pos('<!DOCTYPE',UpperCase(XML))>0)or(Pos('<!ENTITY',UpperCase(XML))>0)or(Pos(#0,XML)>0)or(Pos('<nfeProc',XML)>0)or(Pos('<enviNFe',XML)>0)then Falhar('XML_INVALIDO','Informe um XML NFe sem envelope, DTD ou entidades externas.');
- if not M.NotasFiscais.LoadFromString(XML,False)or(M.NotasFiscais.Count<>1)then Falhar('XML_INVALIDO','XML deve conter uma única NF-e 4.00.');
+ if Texto(Q,'comando')='recuperarXml'then begin
+  { Collection.LoadFromString in the pinned source searches literal NFe tags.
+    Its individual DOM reader supports namespaces; validate the exact root
+    first, then load it directly without rewriting any signed source bytes. }
+  try
+   OriginalKey:=ChaveAlvoRecuperacao(XML);
+   InspecionarAlvoRecuperacao(XML,OriginalKey,OriginalDocument,OriginalDigest);
+  except
+   on E:EFiscal do begin
+    if E.Codigo='RETORNO_INVALIDO'then Falhar('XML_INVALIDO','XML deve conter uma unica NFe assinada sem envelope.');
+    raise;
+   end;
+  end;
+  if not M.NotasFiscais.Add.LerXML(XML)or(M.NotasFiscais.Count<>1)then Falhar('XML_INVALIDO','XML deve conter uma unica NF-e 4.00.');
+  if M.NotasFiscais.Items[0].NumID<>OriginalKey then Falhar('IDENTIDADE_DIVERGENTE','Leitura da NFe diverge da identidade original.');
+ end else if not M.NotasFiscais.LoadFromString(XML,False)or(M.NotasFiscais.Count<>1)then Falhar('XML_INVALIDO','XML deve conter uma única NF-e 4.00.');
  Identidade(M,C);ChaveValida(M.NotasFiscais.Items[0].NumID,C,M);
  with M.NotasFiscais.Items[0].NFe.Ide do if(StrToIntDef(Copy(M.NotasFiscais.Items[0].NumID,23,3),-1)<>serie)or(StrToIntDef(Copy(M.NotasFiscais.Items[0].NumID,26,9),-1)<>nNF)or(Copy(M.NotasFiscais.Items[0].NumID,35,1)<>'1')or(StrToIntDef(Copy(M.NotasFiscais.Items[0].NumID,36,8),-1)<>cNF)then Falhar('IDENTIDADE_DIVERGENTE','Chave fiscal divergente dos dados do documento.');
  if(Texto(Q,'chave',False)<>'')and(Texto(Q,'chave')<>M.NotasFiscais.Items[0].NumID)then Falhar('IDENTIDADE_DIVERGENTE','Chave do XML divergente.');
@@ -77,6 +93,14 @@ end;
 procedure Schema(M:TACBrNFe);
 begin
  try M.NotasFiscais.Validar;except Falhar('XML_SCHEMA_INVALIDO','XML nao atende aos schemas fiscais.');end;
+end;
+procedure SchemaIntegral(M:TACBrNFe;const XML,Base,Name:string);
+var Err:string;
+begin
+ if not FileExists(Base+'schemas/'+Name)then Falhar('SCHEMAS_AUSENTES','Schema de recuperacao indisponivel.');
+ try
+  if not M.SSL.Validar(XML,Base+'schemas/'+Name,Err)then Falhar('XML_SCHEMA_INVALIDO','XML nao atende ao schema de recuperacao.');
+ except on E:EFiscal do raise;on E:Exception do Falhar('XML_SCHEMA_INVALIDO','XML nao atende ao schema de recuperacao.');end;
 end;
 procedure ProtocoloValido(const P:string);
 var I:Integer;
@@ -133,7 +157,7 @@ begin
  Estado(R,S);
 end;
 procedure Executar(Q,R:TJSONObject);
-var M:TACBrNFe;C,Inut:TJSONObject;Base,Cmd,XML,Key,Receipt,Err,J:string;Sending:Boolean;I,Found:Integer;
+var M:TACBrNFe;C,Inut:TJSONObject;Base,Cmd,XML,Key,Receipt,Err,J,Documento,Digest,ConsultaXML,ProtXML,Prot,Motivo:string;Sending:Boolean;I,Found,Code:Integer;
  procedure InicioEnvio;
  begin Sending:=True;R.Booleans['envioIniciado']:=True;MarcadorEnvio(Texto(Q,'id'));end;
 begin
@@ -153,6 +177,34 @@ begin
     Identidade(M,C);XML:=M.NotasFiscais.Items[0].GerarXML;
     if(XML='')or(Length(XML)>4*1024*1024)then Falhar('XML_INVALIDO','XML fiscal vazio ou acima do limite.');
     ChaveValida(M.NotasFiscais.Items[0].NumID,C,M);DefinirTexto(R,'chave',M.NotasFiscais.Items[0].NumID);DefinirTexto(R,'xmlBase64',EncodeStringBase64(XML));Estado(R,'XML_GERADO');
+   end else if Cmd='recuperarXml'then begin
+    CarregarXML(M,Q,C,XML);Key:=M.NotasFiscais.Items[0].NumID;
+    InspecionarAlvoRecuperacao(XML,Key,Documento,Digest);
+    SchemaIntegral(M,XML,Base,'nfe_v4.00.xsd');
+    if not M.SSL.VerificarAssinatura(XML,Err,'infNFe')then Falhar('ASSINATURA_INVALIDA','Assinatura fiscal invalida.');
+    { All input proof is complete and its raw source/digest are preserved above.
+      Clear the temporary model before the key-only query: the pinned ACBr
+      loaded-note path rewrites XMLOriginal with a literal-root writer and an
+      apostrophe replacement. Recovery independently proves the real RetWS. }
+    M.NotasFiscais.Clear;
+    M.WebServices.Consulta.NFeChave:=Key;M.WebServices.Consulta.ExtrairEventos:=False;
+    M.WebServices.Consulta.Executar;
+    ConsultaXML:=M.WebServices.Consulta.RetWS;
+    InspecionarConsultaRecuperacao(ConsultaXML,Key,Digest,Inteiro(C,'ambiente'),M.Configuracoes.WebServices.UFCodigo,Code,Motivo,Prot,ProtXML);
+    SchemaIntegral(M,ConsultaXML,Base,'retConsSitNFe_v4.00.xsd');
+    if Code<>100 then begin
+     R.Add('cStat',Code);DefinirTexto(R,'xMotivo',Motivo);DefinirTexto(R,'chave',Key);
+     DefinirTexto(R,'codigo','RECUPERACAO_NAO_COMPROVADA');Estado(R,'CONSULTADO');R.Booleans['sucesso']:=False;
+    end else begin
+     { Only the authentic query protocol and untouched original are used;
+       protocol scalars and a previous emission response are never composed. }
+     XML:=ComporRecuperacao(Documento,ProtXML);
+     ConferirRecuperacao(XML,Documento,ProtXML);
+     SchemaIntegral(M,XML,Base,'procNFe_v4.00.xsd');
+     if not M.SSL.VerificarAssinatura(XML,Err,'infNFe')then Falhar('ASSINATURA_INVALIDA','Assinatura fiscal invalida no XML recuperado.');
+     DefinirTexto(R,'chave',Key);DefinirTexto(R,'protocolo',Prot);R.Add('cStat',100);DefinirTexto(R,'xMotivo',Motivo);
+     DefinirTexto(R,'xmlBase64',EncodeStringBase64(XML));Estado(R,'XML_RECUPERADO');
+    end;
    end else if(Cmd='validar')or(Cmd='assinar')or(Cmd='transmitir')then begin
     CarregarXML(M,Q,C,XML);Key:=M.NotasFiscais.Items[0].NumID;DefinirTexto(R,'chave',Key);
     if Cmd='assinar'then begin
