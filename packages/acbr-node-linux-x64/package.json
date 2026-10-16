@@ -1,6 +1,6 @@
 {
   "name": "cosmemilton-acbr-node-linux-x64",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "license": "LGPL-2.1-or-later",
   "description": "Motor ACBr linux x64 para cosmemilton-acbr-node",
   "os": [

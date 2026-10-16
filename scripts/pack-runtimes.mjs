@@ -7,7 +7,7 @@ const generated=JSON.parse(await readFile('.acbr/generated/manifest.json','utf8'
 for(const platform of ['linux','win32']){
  const runtime=path.resolve('.acbr/runtime/'+platform+'-x64');
  let manifest;try{manifest=JSON.parse(await readFile(path.join(runtime,'manifest.json'),'utf8'));}catch{if(process.argv.includes('--all'))throw Error('Runtime ausente: '+platform);console.log('Runtime ainda não disponível: '+platform);continue;}
- if(manifest.testOnly===true||manifest.formatVersion!==1||manifest.platform!==platform||manifest.arch!=='x64'||manifest.sourceRevision!==generated.sourceRevision||manifest.contractHash!==generated.contractHash||!manifest.files?.[manifest.executable])throw Error('Runtime divergente do cliente gerado: '+platform);
+ if(manifest.testOnly===true||manifest.formatVersion!==1||manifest.platform!==platform||manifest.arch!=='x64'||manifest.sourceRevision!==generated.sourceRevision||manifest.contractHash!==generated.contractHash||!manifest.files?.[manifest.executable]||!Array.isArray(manifest.capabilities)||!manifest.capabilities.includes('recuperarXml'))throw Error('Runtime divergente do cliente gerado: '+platform);
  for(const [name,hash] of Object.entries(manifest.files)){
   const file=path.resolve(runtime,name),relative=path.relative(runtime,file);
   if(!name||path.isAbsolute(name)||relative==='..'||relative.startsWith('..'+path.sep)||(await lstat(file)).isSymbolicLink())throw Error('Arquivo inválido no runtime.');

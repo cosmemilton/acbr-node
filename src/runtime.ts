@@ -5,7 +5,7 @@ import { createRequire } from 'node:module';
 import { createHash, randomUUID } from 'node:crypto';
 import { TextDecoder } from 'node:util';
 import { ErroAcbrNode, type DetalhesErroAcbr, type ConfiguracaoEmissor, type Contrato, type ConfiguracaoMotor, type RequisicaoMotor, type ResultadoFiscal, type RuntimeManifest, type OpcoesOperacao, type Consulta, type Cancelamento, type CartaCorrecao, type Inutilizacao } from './types.js';
-import { diagnosticarResultado, etapaDaOperacao } from './diagnostics.js';
+import { diagnosticarResultado, etapaDaOperacao, base64XmlRecuperadoValido } from './diagnostics.js';
 export * from './types.js';
 export { diagnosticarErro, diagnosticarResultado } from './diagnostics.js';
 type Launch = (exe: string, args: string[], config: SpawnOptionsWithoutStdio) => ChildProcessWithoutNullStreams;
@@ -15,7 +15,7 @@ export interface OpcoesEmissor extends ConfiguracaoEmissor {
   /** Injeção para testes offline. O padrão sempre inicia o motor distribuído. */
   criaProcesso?: Launch;
 }
-const STATES = new Set(['DENEGADO','XML_GERADO','VALIDADO','ASSINADO','AUTORIZADO','REJEITADO','PENDENTE','INDETERMINADO','CONSULTADO','CANCELADO','EVENTO_REGISTRADO','INUTILIZADO','ERRO']);
+const STATES = new Set(['DENEGADO','XML_GERADO','VALIDADO','ASSINADO','XML_RECUPERADO','AUTORIZADO','REJEITADO','PENDENTE','INDETERMINADO','CONSULTADO','CANCELADO','EVENTO_REGISTRADO','INUTILIZADO','ERRO']);
 const UFS = new Set('AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO'.split(' '));
 const MAX_BYTES = 8 * 1024 * 1024;
 const MAX_TEARDOWN_MS = 1000;
@@ -27,7 +27,7 @@ function confined(root: string, relative: string): string {
   if(!relative || path.isAbsolute(relative) || part==='..' || part.startsWith('..'+path.sep)) throw fail('RUNTIME_INVALIDO','Caminho inválido no runtime.');
   return file;
 }
-async function resolveRuntime(directory: string | undefined, contract: Contrato): Promise<{directory:string;executable:string}> {
+async function resolveRuntime(directory: string | undefined, contract: Contrato): Promise<{directory:string;executable:string;capabilities:ReadonlySet<string>}> {
   if(!validContract(contract)) throw fail('CONTRATO_INVALIDO','Contrato gerado inválido.');
   let root=directory;
   if(!root) {
@@ -39,6 +39,7 @@ async function resolveRuntime(directory: string | undefined, contract: Contrato)
   let m: RuntimeManifest;
   try { m=JSON.parse(await readFile(path.join(root,'manifest.json'),'utf8')); } catch { throw fail('RUNTIME_AUSENTE','Manifesto do runtime não encontrado.'); }
   if(!validContract(m) || m.formatVersion!==1 || !plain(m.files) || typeof m.executable!=='string' || m.platform!==process.platform || m.arch!==process.arch) throw fail('RUNTIME_INVALIDO','Manifesto ou plataforma do runtime inválidos.');
+  if(m.capabilities!==undefined&&(!Array.isArray(m.capabilities)||!m.capabilities.every(value=>typeof value==='string'&&/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(value))))throw fail('RUNTIME_INVALIDO','Capacidades do runtime inválidas.');
   if(m.sourceRevision!==contract.sourceRevision || m.contractHash!==contract.contractHash) throw fail('CONTRATO_DIVERGENTE','Cliente e motor foram gerados de contratos diferentes; regenere e recompile.');
   for(const [name,hash] of Object.entries(m.files)) {
     if(typeof hash!=='string'||!/^[a-f0-9]{64}$/.test(hash)) throw fail('RUNTIME_INVALIDO','Hash inválido no runtime.');
@@ -47,7 +48,7 @@ async function resolveRuntime(directory: string | undefined, contract: Contrato)
     if(createHash('sha256').update(data).digest('hex')!==hash) throw fail('RUNTIME_ALTERADO','O runtime não corresponde ao manifesto distribuído.');
   }
   if(!m.files[m.executable]) throw fail('RUNTIME_INVALIDO','O executável não consta no inventário.');
-  return {directory:root,executable:confined(root,m.executable)};
+  return {directory:root,executable:confined(root,m.executable),capabilities:new Set(m.capabilities??[])};
 }
 interface Pending { req:RequisicaoMotor; bytes:Buffer; signal?:AbortSignal; resolve:(v:ResultadoFiscal)=>void; reject:(e:unknown)=>void; abort?:()=>void }
 export function criarEmissor(options: OpcoesEmissor) {
@@ -65,7 +66,7 @@ export function criarEmissor(options: OpcoesEmissor) {
   if(options.validaDocumento!==undefined&&typeof options.validaDocumento!=='function'||options.criaProcesso!==undefined&&typeof options.criaProcesso!=='function')throw configFail();
   const cfg:Omit<ConfiguracaoEmissor, 'certificado'>={cnpj:options.cnpj,uf:options.uf,modelo:options.modelo,ambiente:options.ambiente,csc:options.csc?{...options.csc}:undefined};
   const certificate=cert?{...cert,pfx:cert.pfx?Buffer.from(cert.pfx):undefined}:undefined;
-  const contract={...options.contrato};
+  const contract={sourceRevision:options.contrato.sourceRevision,contractHash:options.contrato.contractHash};
   const timeout=options.timeoutMs??120_000, capacity=options.limiteFila??32, bytesLimit=options.limiteBytes??MAX_BYTES;
   if(!Number.isInteger(timeout)||timeout<1||timeout>120000)throw configFail('timeoutMs');
   if(!Number.isInteger(capacity)||capacity<0||capacity>1000)throw configFail('limiteFila');
@@ -78,6 +79,7 @@ export function criarEmissor(options: OpcoesEmissor) {
   async function execute(item:Pending):Promise<ResultadoFiscal> {
     if(closed||item.signal?.aborted) throw fail('OPERACAO_CANCELADA','Operação cancelada antes da execução.');
     const runtime=await (runtimePromise??=resolveRuntime(options.runtimeDirectory,contract));
+    if(item.req.comando==='recuperarXml'&&!runtime.capabilities.has('recuperarXml'))throw fail('RUNTIME_SEM_CAPACIDADE','O runtime não oferece recuperação de XML; atualize o pacote e o runtime compatível.',item.req,false,{etapa:'runtime'});
     if(closed||item.signal?.aborted) throw fail('OPERACAO_CANCELADA','Operação cancelada antes da execução.');
     return await new Promise<ResultadoFiscal>((done,rejectExecution)=>{
       let stopError:ErroAcbrNode|undefined; let child:ChildProcessWithoutNullStreams|undefined, finished=false, started=false, sending=false, total=0, rest=Buffer.alloc(0), result:ResultadoFiscal|undefined;
@@ -138,9 +140,11 @@ export function criarEmissor(options: OpcoesEmissor) {
             if(!plain(frame)||frame.id!==item.req.id)throw Error();
             if(frame.tipo==='envioIniciado'){sending=true;continue;}
             if(result||frame.versao!==1||frame.sourceRevision!==contract.sourceRevision||frame.contractHash!==contract.contractHash||typeof frame.sucesso!=='boolean'||!STATES.has(String(frame.estado)))throw Error();
-            if(frame.xmlBase64!==undefined&&(typeof frame.xmlBase64!=='string'||!frame.xmlBase64.length||Buffer.from(frame.xmlBase64,'base64').toString('base64')!==frame.xmlBase64))throw Error();
+            if(frame.xmlBase64!==undefined&&(item.req.comando==='recuperarXml'?!base64XmlRecuperadoValido(frame.xmlBase64):typeof frame.xmlBase64!=='string'||!frame.xmlBase64.length||Buffer.from(frame.xmlBase64,'base64').toString('base64')!==frame.xmlBase64))throw Error();
             if(frame.cStat!==undefined&&(!Number.isInteger(frame.cStat)||Number(frame.cStat)<1||Number(frame.cStat)>9999))throw Error();
             if(frame.envioIniciado!==undefined&&typeof frame.envioIniciado!=='boolean'||sending&&frame.envioIniciado===false)throw Error();
+            if(frame.estado==='XML_RECUPERADO'&&item.req.comando!=='recuperarXml')throw Error();
+            if(item.req.comando==='recuperarXml'&&(frame.sucesso===true||frame.estado==='XML_RECUPERADO')&&(frame.sucesso!==true||frame.estado!=='XML_RECUPERADO'||frame.cStat!==100||typeof frame.chave!=='string'||!/^\d{44}$/.test(frame.chave)||typeof frame.protocolo!=='string'||!/^\d{15}$/.test(frame.protocolo)||typeof frame.xmlBase64!=='string'||frame.envioIniciado===true||sending))throw Error();
             const fiscal=frame as unknown as ResultadoFiscal;
             result={...fiscal,diagnostico:diagnosticarResultado(sending?{...fiscal,envioIniciado:true}:fiscal,item.req.comando)};
           }catch{stop('RESPOSTA_INVALIDA','O motor retornou uma resposta inválida.');return;}
@@ -165,12 +169,12 @@ export function criarEmissor(options: OpcoesEmissor) {
     if(signal!==undefined&&(!plain(signal)||typeof signal.aborted!=='boolean'||typeof signal.addEventListener!=='function'||typeof signal.removeEventListener!=='function'))throw fail('OPERACAO_INVALIDA','Informe opções válidas para a operação.',undefined,false,{etapa:etapaDaOperacao(command),campo:'signal'});
     if(closed)throw closedError();
     if(operation.signal?.aborted)throw fail('OPERACAO_CANCELADA','Operação cancelada antes da execução.');
-    if(['assinar','transmitir','consultar','cancelar','cartaCorrecao','inutilizar'].includes(command)&&!certificate)throw fail('CERTIFICADO_AUSENTE','A operação exige um certificado A1.');
+    if(['assinar','transmitir','consultar','recuperarXml','cancelar','cartaCorrecao','inutilizar'].includes(command)&&!certificate)throw fail('CERTIFICADO_AUSENTE','A operação exige um certificado A1.',undefined,false,{etapa:etapaDaOperacao(command)});
     if(command==='gerarXml')options.validaDocumento?.(data.documento);
     const config:ConfiguracaoMotor={...cfg};
     if(certificate){let pfx:Buffer;try{pfx=certificate.pfx??await readFile(certificate.arquivo!);}catch{throw fail('CERTIFICADO_AUSENTE','Não foi possível ler o A1 configurado.');}if(pfx.length>2*1024*1024)throw fail('CERTIFICADO_EXCESSIVO','Certificado excede o limite.');config.certificado={pfxBase64:pfx.toString('base64'),senha:certificate.senha};}
     let bytes:Buffer, req:RequisicaoMotor;
-    try{bytes=Buffer.from(JSON.stringify({versao:1,id:randomUUID(),...contract,comando:command,config,...data})+'\n','utf8');if(bytes.length>bytesLimit)throw Error();req=JSON.parse(bytes.toString('utf8'));}catch{throw fail('REQUISICAO_INVALIDA','Dados da operação inválidos ou acima do limite.');}
+    try{bytes=Buffer.from(JSON.stringify({...data,...contract,versao:1,id:randomUUID(),comando:command,config})+'\n','utf8');if(bytes.length>bytesLimit)throw Error();req=JSON.parse(bytes.toString('utf8'));}catch{throw fail('REQUISICAO_INVALIDA','Dados da operação inválidos ou acima do limite.');}
     return new Promise((resolve,reject)=>{
       if(closed){bytes.fill(0);reject(closedError());return;}
       if(busy&&queue.length>=capacity){bytes.fill(0);reject(fail('FILA_CHEIA','A fila fiscal está cheia.'));return;}
@@ -188,9 +192,10 @@ export function criarEmissor(options: OpcoesEmissor) {
     validar:(xml:string,op?:OpcoesOperacao)=>request('validar',xmlData(xml),op),
     assinar:(xml:string,op?:OpcoesOperacao)=>request('assinar',xmlData(xml),op),
     transmitir:(xml:string,op?:OpcoesOperacao)=>request('transmitir',xmlData(xml),op),
-    consultar:(consulta:Consulta,op?:OpcoesOperacao)=>{checkObject(consulta,'consulta');checkKey(consulta.chave);if(consulta.recibo!==undefined&&(typeof consulta.recibo!=='string'||!/^\d{15}$/.test(consulta.recibo)))throw fail('RECIBO_INVALIDO','Recibo inválido.',undefined,false,{campo:'recibo'});return request('consultar',consulta,op);},
-    cancelar:(data:Cancelamento,op?:OpcoesOperacao)=>{checkObject(data,'cancelamento');checkKey(data.chave);reason(data.justificativa);if(typeof data.protocolo!=='string'||!/^\d{15}$/.test(data.protocolo))throw fail('PROTOCOLO_INVALIDO','Protocolo inválido.',undefined,false,{campo:'protocolo'});return request('cancelar',data,op);},
-    cartaCorrecao:(data:CartaCorrecao,op?:OpcoesOperacao)=>{checkObject(data,'cartaCorrecao');if(cfg.modelo!==55)throw fail('OPERACAO_NAO_SUPORTADA','Carta de correção exige NF-e modelo 55.');checkKey(data.chave);if(typeof data.correcao!=='string'||data.correcao.length<15||data.correcao.length>1000||!Number.isInteger(data.sequenciaEvento??1)||(data.sequenciaEvento??1)<1||(data.sequenciaEvento??1)>20)throw fail('CORRECAO_INVALIDA','Dados da carta de correção inválidos.',undefined,false,{campo:'cartaCorrecao'});return request('cartaCorrecao',{...data,sequenciaEvento:data.sequenciaEvento??1},op);},
+    recuperarXml:(xmlAssinado:string,opcoes?:OpcoesOperacao)=>request('recuperarXml',xmlData(xmlAssinado),opcoes),
+    consultar:(consulta:Consulta,op?:OpcoesOperacao)=>{checkObject(consulta,'consulta');checkKey(consulta.chave);if(consulta.recibo!==undefined&&(typeof consulta.recibo!=='string'||!/^\d{15}$/.test(consulta.recibo)))throw fail('RECIBO_INVALIDO','Recibo inválido.',undefined,false,{campo:'recibo'});return request('consultar',{chave:consulta.chave,...(consulta.recibo!==undefined?{recibo:consulta.recibo}:{})},op);},
+    cancelar:(data:Cancelamento,op?:OpcoesOperacao)=>{checkObject(data,'cancelamento');checkKey(data.chave);reason(data.justificativa);if(typeof data.protocolo!=='string'||!/^\d{15}$/.test(data.protocolo))throw fail('PROTOCOLO_INVALIDO','Protocolo inválido.',undefined,false,{campo:'protocolo'});return request('cancelar',{chave:data.chave,protocolo:data.protocolo,justificativa:data.justificativa},op);},
+    cartaCorrecao:(data:CartaCorrecao,op?:OpcoesOperacao)=>{checkObject(data,'cartaCorrecao');if(cfg.modelo!==55)throw fail('OPERACAO_NAO_SUPORTADA','Carta de correção exige NF-e modelo 55.');checkKey(data.chave);if(typeof data.correcao!=='string'||data.correcao.length<15||data.correcao.length>1000||!Number.isInteger(data.sequenciaEvento??1)||(data.sequenciaEvento??1)<1||(data.sequenciaEvento??1)>20)throw fail('CORRECAO_INVALIDA','Dados da carta de correção inválidos.',undefined,false,{campo:'cartaCorrecao'});return request('cartaCorrecao',{chave:data.chave,correcao:data.correcao,sequenciaEvento:data.sequenciaEvento??1},op);},
     inutilizar:(data:Inutilizacao,op?:OpcoesOperacao)=>{checkObject(data,'inutilizacao');reason(data.justificativa);if(!Number.isInteger(data.ano)||data.ano<0||data.ano>99||!Number.isInteger(data.serie)||data.serie<0||data.serie>999||!Number.isInteger(data.numeroInicial)||data.numeroInicial<1||!Number.isInteger(data.numeroFinal)||data.numeroFinal<data.numeroInicial||data.numeroFinal>999999999)throw fail('INUTILIZACAO_INVALIDA','Faixa de inutilização inválida.',undefined,false,{campo:'inutilizacao'});return request('inutilizar',{inutilizacao:{ano:data.ano,serie:data.serie,numeroInicial:data.numeroInicial,numeroFinal:data.numeroFinal},justificativa:data.justificativa},op);},
     async fechar(){if(!closed){closed=true;rejectQueue();}const running=current;try{running?.stop();if(running)await running.done;}finally{certificate?.pfx?.fill(0);}}
   };

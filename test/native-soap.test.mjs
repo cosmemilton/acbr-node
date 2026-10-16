@@ -6,7 +6,7 @@ import {fileURLToPath}from'node:url';
 import path from'node:path';
 import os from'node:os';
 import https from'node:https';
-import {certificado,documento,CNPJ,tlsCertificates}from'./native-fixtures.mjs';
+import {certificado,documento,CNPJ,tlsCertificates,partesAssinadas,comAspasSimples,comComplemento,comPrefixo,criarAssinadorSintetico,respostaConsulta}from'./native-fixtures.mjs';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const enabled=process.env.ACBR_NATIVE_TEST==='1';
 const runtime=process.env.ACBR_NODE_TEST_RUNTIME_DIR??path.join(root,'.acbr','test-runtime',process.platform+'-'+process.arch);
@@ -19,7 +19,7 @@ const date=()=>new Date().toISOString().replace(/\.\d{3}Z$/,'-00:00');
 const wrap=(body,service)=>`<?xml version="1.0" encoding="UTF-8"?><soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope"><soap:Body><nfeResultMsg xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/${service}">${body}</nfeResultMsg></soap:Body></soap:Envelope>`;
 const prot=(key,code=100,digest='')=>`<protNFe versao="4.00"><infProt><tpAmb>2</tpAmb><verAplic>SYNTHETIC</verAplic><chNFe>${key}</chNFe><dhRecbto>${date()}</dhRecbto><nProt>123456789012345</nProt>${digest?'<digVal>'+digest+'</digVal>':''}<cStat>${code}</cStat><xMotivo>SYNTHETIC OFFLINE RESPONSE</xMotivo></infProt></protNFe>`;
 const envio=(code,key,digest)=>`<retEnviNFe xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00"><tpAmb>2</tpAmb><verAplic>SYNTHETIC</verAplic><cStat>${code}</cStat><xMotivo>SYNTHETIC OFFLINE RESPONSE</xMotivo><cUF>23</cUF><dhRecbto>${date()}</dhRecbto>${code===104?prot(key,100,digest):code===103?'<infRec><nRec>123456789012345</nRec><tMed>1</tMed></infRec>':''}</retEnviNFe>`;
-test('ACBr real usa SOAP localhost simulado sem recompor XML assinado',{skip:!enabled,timeout:180000},async t=>{
+test('ACBr real usa SOAP localhost simulado sem recompor XML assinado',{skip:!enabled,timeout:300000},async t=>{
  const manifest=JSON.parse(await readFile(path.join(runtime,'manifest.json'),'utf8'));assert.equal(manifest.testOnly,true,'network simulations require the isolated test build');
  const tmp=await mkdtemp(path.join(os.tmpdir(),'acbr-node-soap-'));t.after(()=>rm(tmp,{recursive:true,force:true}));
  const certs=tlsCertificates();const caFile=path.join(tmp,'ca.pem');await writeFile(caFile,certs.ca);
@@ -48,6 +48,168 @@ test('ACBr real usa SOAP localhost simulado sem recompor XML assinado',{skip:!en
  await t.test('autorização de outra chave fica indeterminada',async()=>{handler=(_req,res)=>respond(res,envio(104,signed.chave.slice(0,-1)+(signed.chave.endsWith('0')?'1':'0'),digest));const{result}=await transmit();assert.equal(result.estado,'INDETERMINADO');assert.equal(result.xmlBase64,signed.xmlBase64);assert.equal(result.cStat,undefined);});
  await t.test('timeout preserva XML e exige consulta',async()=>{handler=(_req,res)=>setTimeout(()=>respond(res,envio(104,signed.chave,digest)),1800);const{result}=await transmit();assert.equal(result.estado,'INDETERMINADO');assert.equal(result.xmlBase64,signed.xmlBase64);assert.equal(result.chave,signed.chave);assert.equal(result.envioIniciado,true);assert.equal(result.protocolo,undefined);});
  await t.test('consulta por chave identifica a mesma nota',async()=>{handler=(_req,res)=>respond(res,`<retConsSitNFe xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00"><tpAmb>2</tpAmb><verAplic>SYNTHETIC</verAplic><cStat>100</cStat><xMotivo>AUTORIZADO SINTETICO</xMotivo><cUF>23</cUF>${prot(signed.chave,100,digest)}</retConsSitNFe>`,'NFeConsultaProtocolo4');const{result,frames}=await run({...base,comando:'consultar',chave:signed.chave},env);assert.equal(result.estado,'AUTORIZADO',result.codigo);assert.equal(result.chave,signed.chave);assert.equal(frames.length,1);});
+ await t.test('recuperarXml exige assinatura local e protocolo correlacionado sem transmitir',async recovery=>{
+  const original=partesAssinadas(signed.xmlBase64);
+  const recover=(xmlBase64=signed.xmlBase64,extra={})=>run({...base,comando:'recuperarXml',xmlBase64,...extra},env);
+  const mockConsulta=(options={})=>{
+   bodies=[];
+   handler=(_req,res)=>respond(res,respostaConsulta({chave:signed.chave,digest:original.digest,...options}),'NFeConsultaProtocolo4');
+  };
+  const readonly=({result,frames})=>{
+   assert.equal(result.envioIniciado,false);
+   assert.equal(frames.length,1,'read-only recovery must not emit an envioIniciado frame');
+   assert.ok(frames.every(frame=>frame.tipo!=='envioIniciado'));
+   assert.ok(bodies.length<=1,'recovery must never repeat the consultation');
+   for(const body of bodies){
+    assert.match(body,/<(?:[A-Za-z_][\w.-]*:)?consSitNFe(?:\s|>)/);
+    assert.doesNotMatch(body,/<(?:[A-Za-z_][\w.-]*:)?(?:NFe|enviNFe|Signature|emit)(?:\s|>)/,
+     'the query must never contain the invoice, its signature or an authorization batch');
+   }
+  };
+  const rejected=(output,codes)=>{
+   readonly(output);
+   assert.equal(output.result.sucesso,false);
+   assert.notEqual(output.result.estado,'XML_RECUPERADO');
+   assert.equal(output.result.xmlBase64,undefined,'unproven recovery must not return an XML process');
+   assert.equal(output.result.protocolo,undefined);
+   assert.ok(codes.includes(output.result.codigo),output.result.codigo);
+  };
+  const recovered=(output,input=signed)=>{
+   readonly(output);
+   assert.equal(output.result.sucesso,true,output.result.codigo);
+   assert.equal(output.result.estado,'XML_RECUPERADO',output.result.codigo);
+   assert.equal(output.result.cStat,100);
+   assert.equal(output.result.chave,input.chave);
+   assert.equal(output.result.protocolo,'123456789012345');
+   const supplied=partesAssinadas(input.xmlBase64),processed=partesAssinadas(output.result.xmlBase64);
+   assert.match(processed.xml,/<(?:[A-Za-z_][\w.-]*:)?nfeProc(?:\s|>)/);
+   assert.equal(processed.nfe,supplied.nfe,'the original NFe bytes must be preserved inside nfeProc');
+   assert.equal(processed.assinatura,supplied.assinatura,'the original Signature bytes must be preserved');
+   assert.equal(processed.digest,supplied.digest);
+   assert.equal((processed.xml.match(/<(?:[A-Za-z_][\w.-]*:)?protNFe(?:\s|>)/g)??[]).length,1);
+   assert.match(processed.xml,/<(?:[A-Za-z_][\w.-]*:)?xMotivo>RESPOSTA D'EXEMPLO SINTETICO<\/(?:[A-Za-z_][\w.-]*:)?xMotivo>/,
+    'the protocol apostrophe must remain unchanged by the recovery compositor');
+   assert.equal(bodies.length,1,'recovery performs exactly one consultation');
+   assert.ok(bodies[0].includes('<chNFe>'+input.chave+'</chNFe>'));
+  };
+  await recovery.test('100 recupera nfeProc com NFe e Signature originais',async()=>{
+   mockConsulta();recovered(await recover());
+  });
+  let prefixedFixture;
+  const originalPrefixado=()=>prefixedFixture??= (async()=>{
+   const signer=await criarAssinadorSintetico({root,runtime});
+   const unsignedPrefixed=comPrefixo(unsigned,'n');
+   const output=await signer({xmlBase64:unsignedPrefixed.xmlBase64,...config.certificado});
+   assert.equal(output.assinaturaValida,true,[output.codigo,output.etapa].filter(Boolean).join(': '));
+   const input={chave:unsignedPrefixed.chave,xmlBase64:output.xmlBase64},parts=partesAssinadas(input.xmlBase64);
+   assert.match(parts.nfe,/^<n:NFe\b/);
+   assert.doesNotMatch(parts.nfe.match(/^<[^>]+>/)?.[0]??'',/\sxmlns\s*=/,
+    'the original invoice must have no default namespace declaration');
+   assert.deepEqual(await signer({xmlBase64:input.xmlBase64,verificarOnly:true}),{assinaturaValida:true});
+   return{signer,input,parts};
+  })();
+  await recovery.test('original prefixado sem namespace default mantém crypto válida no processo final',async()=>{
+   const{signer,input,parts}=await originalPrefixado();
+   mockConsulta({chave:input.chave,digest:parts.digest});
+   const output=await recover(input.xmlBase64);recovered(output,input);
+   assert.match(Buffer.from(output.result.xmlBase64,'base64').toString('utf8'),/<n:nfeProc\b/);
+   assert.deepEqual(await signer({xmlBase64:output.result.xmlBase64,verificarOnly:true}),{assinaturaValida:true},
+    'verify the complete nfeProc context, not an extracted standalone NFe');
+  });
+  for(const prefixed of[false,true])await recovery.test(
+   'original '+(prefixed?'prefixado':'com namespace default')+' com protocolo DSig é recusado sem produzir processo',async()=>{
+   const fixture=await originalPrefixado(),{signer}=fixture;
+   const{input,parts}=prefixed?fixture:{input:signed,parts:original};
+   const protocol=prot(input.chave,100,parts.digest)
+    .replace('<protNFe versao=', '<protNFe xmlns="http://www.portalfiscal.inf.br/nfe" versao=')
+    .replace('<infProt>','<infProt Id="ID123456789012345">');
+   const signedProtocol=await signer({xmlBase64:Buffer.from(protocol).toString('base64'),
+    ...config.certificado,documento:'protNFe'});
+   assert.equal(signedProtocol.assinaturaValida,true,[signedProtocol.codigo,signedProtocol.etapa].filter(Boolean).join(': '));
+   const signedRoot=Buffer.from(signedProtocol.xmlBase64,'base64').toString('utf8')
+    .match(/<protNFe\b[\s\S]*?<\/protNFe>/)?.[0];
+   assert.ok(signedRoot);assert.match(signedRoot,/<(?:[A-Za-z_][\w.-]*:)?Signature(?:\s|>)/);
+   const response=respostaConsulta({chave:input.chave,digest:parts.digest})
+    .replace(/<protNFe\b[\s\S]*?<\/protNFe>/,()=>signedRoot);
+   bodies=[];handler=(_req,res)=>respond(res,response,'NFeConsultaProtocolo4');
+   rejected(await recover(input.xmlBase64),['RECUPERACAO_NAO_COMPROVADA']);assert.equal(bodies.length,1);
+  });
+  await recovery.test('NFC-e preserva também suplemento e QRCode originais',async()=>{
+   const nfceConfig={...config,modelo:65,csc:{id:'000001',valor:'CSC-SINTETICO-RECUPERACAO-OFFLINE'}};
+   const nfce=(await run({...base,config:nfceConfig,comando:'assinar',...documento(65)},env)).result;
+   assert.equal(nfce.estado,'ASSINADO',nfce.codigo);
+   const input=partesAssinadas(nfce.xmlBase64);assert.match(input.nfe,/<infNFeSupl>/);
+   mockConsulta({chave:nfce.chave,digest:input.digest});
+   recovered(await recover(nfce.xmlBase64,{config:nfceConfig}),nfce);
+  });
+  await recovery.test('aspas simples e apóstrofo em texto preservam o XML assinado byte a byte',async()=>{
+   const quoted=(await run({...base,comando:'assinar',...comComplemento(unsigned,"TESTE D'AGUA SINTETICO & OFFLINE")},env)).result;
+   assert.equal(quoted.estado,'ASSINADO',quoted.codigo);
+   const input={chave:quoted.chave,xmlBase64:comAspasSimples(quoted.xmlBase64)};
+   assert.match(partesAssinadas(input.xmlBase64).assinatura,/='/);
+   mockConsulta({digest:partesAssinadas(input.xmlBase64).digest});
+   recovered(await recover(input.xmlBase64),input);
+  });
+  await recovery.test('namespace prefixado no retorno de consulta é lido sem alterar a assinatura',async()=>{
+   mockConsulta({prefixo:'nfe'});recovered(await recover());
+  });
+  for(const[description,xmlBase64,extra,codes]of[
+   ['XML mal formado',Buffer.from('<NFe>').toString('base64'),{},['XML_INVALIDO','OPERACAO_FISCAL_FALHOU']],
+   ['processo já envelopado',Buffer.from('<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00">'+original.nfe+'</nfeProc>').toString('base64'),{},['XML_INVALIDO']],
+   ['processo prefixado já envelopado',Buffer.from('<p:nfeProc xmlns:p="http://www.portalfiscal.inf.br/nfe" versao="4.00">'+original.nfe+'</p:nfeProc>').toString('base64'),{},['XML_INVALIDO']],
+   ['infNFe duplicado',Buffer.from(original.xml.replace(/(<infNFe\b[\s\S]*?<\/infNFe>)/,(_match,info)=>info+info)).toString('base64'),{},['XML_INVALIDO']],
+   ['DTD',Buffer.from('<!DOCTYPE NFe [<!ENTITY test "SYNTHETIC">]><NFe>&test;</NFe>').toString('base64'),{},['XML_INVALIDO']],
+   ['XML não assinado',unsigned.xmlBase64,{},['XML_NAO_ASSINADO']],
+   ['conteúdo adulterado',comComplemento(signed,'CONTEUDO ADULTERADO SINTETICO').xmlBase64,{},['ASSINATURA_INVALIDA']],
+   ['schema inválido',Buffer.from(original.xml.replace('<NCM>22021000</NCM>','<NCM>INVALIDO</NCM>')).toString('base64'),{},['XML_SCHEMA_INVALIDO']],
+   ['DV incorreto na chave',Buffer.from(original.xml.replaceAll(signed.chave,signed.chave.slice(0,-1)+(signed.chave.endsWith('0')?'1':'0'))).toString('base64'),{},['IDENTIDADE_DIVERGENTE']],
+   ['ambiente diferente da configuração',signed.xmlBase64,{config:{...config,ambiente:1}},['IDENTIDADE_DIVERGENTE']],
+   ['modelo diferente da configuração',signed.xmlBase64,{config:{...config,modelo:65}},['IDENTIDADE_DIVERGENTE']]
+  ])await recovery.test(description+' falha antes de qualquer consulta',async()=>{
+   mockConsulta();rejected(await recover(xmlBase64,extra),codes);assert.equal(bodies.length,0);
+  });
+  for(const field of['chave','recibo','protocolo'])await recovery.test('contrato recusa parâmetro extra '+field,async()=>{
+   mockConsulta();rejected(await recover(signed.xmlBase64,{[field]:field==='chave'?signed.chave:'123456789012345'}),['REQUISICAO_INVALIDA']);assert.equal(bodies.length,0);
+  });
+  for(const cStat of[150,217,101,110])await recovery.test('consulta '+cStat+' não fornece processo autorizado',async()=>{
+   mockConsulta({cStat,incluirProtocolo:cStat===150});
+   const output=await recover();rejected(output,['RECUPERACAO_NAO_COMPROVADA']);
+   assert.equal(output.result.estado,'CONSULTADO');assert.equal(output.result.cStat,cStat);assert.equal(bodies.length,1);
+  });
+  for(const[description,options,codes]of[
+   ['protocolo ausente',{incluirProtocolo:false},['RECUPERACAO_NAO_COMPROVADA']],
+   ['digVal ausente',{digest:undefined},['RECUPERACAO_NAO_COMPROVADA']],
+   ['digVal vazio',{digest:''},['RECUPERACAO_NAO_COMPROVADA','XML_SCHEMA_INVALIDO']],
+   ['digVal divergente',{digest:Buffer.alloc(Buffer.from(original.digest,'base64').length,1).toString('base64')},['IDENTIDADE_DIVERGENTE']],
+   ['digVal com diferença somente de caixa',{digest:original.digest.replace(/[A-Za-z]/,c=>c===c.toLowerCase()?c.toUpperCase():c.toLowerCase())},['IDENTIDADE_DIVERGENTE']],
+   ['chave externa de outro documento',{chaveRetorno:documento(65).chave},['IDENTIDADE_DIVERGENTE']],
+   ['chave de outro documento',{chaveProtocolo:documento(65).chave},['IDENTIDADE_DIVERGENTE']],
+   ['ambiente do retorno divergente',{ambiente:1},['IDENTIDADE_DIVERGENTE']],
+   ['ambiente do protocolo divergente',{ambienteProtocolo:1},['IDENTIDADE_DIVERGENTE']],
+   ['UF divergente',{cUF:35},['IDENTIDADE_DIVERGENTE']],
+   ['status interno diferente de 100',{statusProtocolo:150},['IDENTIDADE_DIVERGENTE']],
+   ['nProt ausente',{protocolo:null},['RECUPERACAO_NAO_COMPROVADA','XML_SCHEMA_INVALIDO']],
+   ['nProt não numérico',{protocolo:'ABCDEFGHIJKLMNO'},['XML_SCHEMA_INVALIDO','RETORNO_INVALIDO']],
+   ['nProt curto',{protocolo:'12345678901234'},['XML_SCHEMA_INVALIDO','RETORNO_INVALIDO','RECUPERACAO_NAO_COMPROVADA']],
+   ['nProt longo',{protocolo:'1234567890123456'},['XML_SCHEMA_INVALIDO','RETORNO_INVALIDO','RECUPERACAO_NAO_COMPROVADA']],
+   ['namespace incorreto',{namespace:'urn:acbr-node:synthetic-invalid'},['XML_SCHEMA_INVALIDO','RETORNO_INVALIDO']]
+  ])await recovery.test(description+' nunca produz nfeProc',async()=>{
+   mockConsulta(options);rejected(await recover(),codes);assert.equal(bodies.length,1);
+  });
+  await recovery.test('mesma chave e assinatura nova não podem reutilizar digest do documento anterior',async()=>{
+   const other=(await run({...base,comando:'assinar',...comComplemento(unsigned,'OUTRO CONTEUDO SINTETICO COM A MESMA CHAVE')},env)).result;
+   assert.equal(other.estado,'ASSINADO',other.codigo);assert.equal(other.chave,signed.chave);
+   assert.notEqual(partesAssinadas(other.xmlBase64).digest,original.digest);
+   mockConsulta();rejected(await recover(other.xmlBase64),['IDENTIDADE_DIVERGENTE']);assert.equal(bodies.length,1);
+  });
+  for(const variant of['malformed','duplicate'])await recovery.test('resposta '+variant+' nunca produz nfeProc',async()=>{
+   bodies=[];
+   const response=variant==='malformed'?'<retConsSitNFe>':respostaConsulta({chave:signed.chave,digest:original.digest})
+    .replace('</retConsSitNFe>',prot(signed.chave,100,original.digest)+'</retConsSitNFe>');
+   handler=(_req,res)=>respond(res,response,'NFeConsultaProtocolo4');
+   rejected(await recover(),['RETORNO_INVALIDO','XML_SCHEMA_INVALIDO','OPERACAO_FISCAL_FALHOU']);assert.equal(bodies.length,1);
+  });
+ });
  await t.test('consulta por recibo 105 continua pendente',async()=>{handler=(_req,res)=>respond(res,`<retConsReciNFe xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00"><tpAmb>2</tpAmb><verAplic>SYNTHETIC</verAplic><nRec>123456789012345</nRec><cStat>105</cStat><xMotivo>LOTE EM PROCESSAMENTO SINTETICO</xMotivo><cUF>23</cUF></retConsReciNFe>`,'NFeRetAutorizacao4');const{result}=await run({...base,comando:'consultar',chave:signed.chave,recibo:'123456789012345'},env);assert.equal(result.estado,'PENDENTE',result.codigo);assert.equal(result.cStat,105);});
  for(const cmd of['cancelar','cartaCorrecao'])await t.test('evento '+cmd+' retorna protocolo correlacionado',async()=>{const code=cmd==='cancelar'?110111:110110;handler=(_req,res)=>respond(res,`<retEnvEvento xmlns="http://www.portalfiscal.inf.br/nfe" versao="1.00"><idLote>1</idLote><tpAmb>2</tpAmb><verAplic>SYNTHETIC</verAplic><cOrgao>23</cOrgao><cStat>128</cStat><xMotivo>LOTE SINTETICO PROCESSADO</xMotivo><retEvento versao="1.00"><infEvento><tpAmb>2</tpAmb><verAplic>SYNTHETIC</verAplic><cOrgao>23</cOrgao><cStat>135</cStat><xMotivo>EVENTO SINTETICO REGISTRADO</xMotivo><chNFe>${signed.chave}</chNFe><tpEvento>${code}</tpEvento><xEvento>SYNTHETIC</xEvento><nSeqEvento>1</nSeqEvento><dhRegEvento>${date()}</dhRegEvento><nProt>123456789012345</nProt></infEvento></retEvento></retEnvEvento>`,'NFeRecepcaoEvento4');const{result}=await run({...base,comando:cmd,chave:signed.chave,protocolo:'123456789012345',justificativa:'JUSTIFICATIVA SINTETICA OFFLINE',correcao:'CORRECAO SINTETICA OFFLINE PARA TESTE',sequenciaEvento:1},env);assert.equal(result.estado,cmd==='cancelar'?'CANCELADO':'EVENTO_REGISTRADO',result.codigo);assert.equal(result.protocolo,'123456789012345');});
  await t.test('inutilização registra faixa sem executar produção',async()=>{handler=(_req,res)=>respond(res,`<retInutNFe xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00"><infInut><tpAmb>2</tpAmb><verAplic>SYNTHETIC</verAplic><cStat>102</cStat><xMotivo>FAIXA SINTETICA INUTILIZADA</xMotivo><cUF>23</cUF><ano>${new Date().getFullYear()%100}</ano><CNPJ>${CNPJ}</CNPJ><mod>55</mod><serie>1</serie><nNFIni>10</nNFIni><nNFFin>11</nNFFin><dhRecbto>${date()}</dhRecbto><nProt>123456789012345</nProt></infInut></retInutNFe>`,'NFeInutilizacao4');const{result}=await run({...base,comando:'inutilizar',inutilizacao:{ano:new Date().getFullYear()%100,serie:1,numeroInicial:10,numeroFinal:11},justificativa:'JUSTIFICATIVA SINTETICA OFFLINE'},env);assert.equal(result.estado,'INUTILIZADO',result.codigo);assert.equal(result.cStat,102);});

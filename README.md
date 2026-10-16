@@ -14,32 +14,33 @@ npm install cosmemilton-acbr-node
 
 O npm instala o runtime opcional da sua plataforma. Não use `--omit=optional` na instalação final. Também é possível informar `runtimeDirectory` para um motor próprio.
 
-O help TAG faz parte da release 0.1.2. A documentação pública só anuncia disponibilidade após a confirmação dessa versão no registry npm.
+Esta documentação descreve a versão 0.2.0, que adiciona `recuperarXml` e mantém o help TAG introduzido na 0.1.2. A disponibilidade da 0.2.0 no npm só é anunciada após a confirmação dessa versão no registry.
 
 Para instalar tarballs revisados em um projeto separado, informe o SDK e o runtime da plataforma:
 
 ```bash
 npm install --offline --ignore-scripts --no-audit --no-fund \
-  /caminho/cosmemilton-acbr-node-0.1.2.tgz \
-  /caminho/cosmemilton-acbr-node-linux-x64-0.1.2.tgz
+  /caminho/cosmemilton-acbr-node-0.2.0.tgz \
+  /caminho/cosmemilton-acbr-node-linux-x64-0.2.0.tgz
 ```
 
-No Windows, selecione `cosmemilton-acbr-node-win32-x64-0.1.2.tgz`.
+No Windows, selecione `cosmemilton-acbr-node-win32-x64-0.2.0.tgz`.
 
 ```ts
-import { readFile, writeFile } from 'node:fs/promises';
+import { writeFile } from 'node:fs/promises';
 import { criarEmissor, TNFe, type TNFeInput } from 'cosmemilton-acbr-node';
 import { nota } from './nota.js'; // nota: TNFeInput, com dados fiscais completos
+import { lerA1Privado } from './credencial-local.js'; // função da aplicação
 
-const senha = process.env.NFE_A1_SENHA;
-if (senha === undefined) throw new Error('Configure NFE_A1_SENHA');
+// A aplicação lê o PFX e pede a senha de forma oculta, sem argv, env ou logs.
+const certificado = await lerA1Privado(); // { pfx: Uint8Array, senha: string }
 
 const emissor = criarEmissor({
   cnpj: '11222333000181',
   uf: 'CE',
   modelo: 55,
   ambiente: 2,
-  certificado: { pfx: await readFile('./certificado.pfx'), senha },
+  certificado,
   // Para NFC-e: modelo: 65, csc: { id: '000001', valor: 'seu CSC' }
 });
 
@@ -55,17 +56,45 @@ try {
   await writeFile('./nota-assinada.xml', Buffer.from(assinado.xmlBase64, 'base64'));
   // Transmissão explícita: await emissor.transmitir(xmlAssinado).
 } finally {
-  await emissor.fechar();
+  try { await emissor.fechar(); }
+  finally { certificado.pfx.fill(0); certificado.senha = ''; }
 }
 ```
 
-A biblioteca também aceita XML pronto em `assinar`, `validar` e `transmitir`. As operações fiscais são `consultar`, `cancelar`, `cartaCorrecao` (somente modelo 55) e `inutilizar`. [API e protocolo](docs/API.md).
+A biblioteca também aceita XML pronto em `assinar`, `validar`, `transmitir` e `recuperarXml`. As operações fiscais incluem `consultar`, `recuperarXml`, `cancelar`, `cartaCorrecao` (somente modelo 55) e `inutilizar`. `lerA1Privado` acima pertence à aplicação, não ao SDK. [API e protocolo](docs/API.md).
+
+## Recuperar o XML autorizado
+
+`consultar({ chave })` continua devolvendo o XML de resposta da consulta em `xmlBase64`, normalmente `retConsSitNFe`. Para obter o processo completo a partir de uma NF-e já assinada e preservada, use `recuperarXml(xmlAssinado, opcoes?)`. O argumento `opcoes` pode ser omitido e aceita somente `signal?: AbortSignal`:
+
+```ts
+const controlador = new AbortController();
+const opcoes = { signal: controlador.signal };
+// A interface pode chamar controlador.abort() para solicitar cancelamento.
+const resultado = await emissor.recuperarXml(xmlAssinado, opcoes);
+if (resultado.sucesso === true && resultado.estado === 'XML_RECUPERADO'
+    && resultado.cStat === 100 && resultado.xmlBase64) {
+  const xmlProcessado = Buffer.from(resultado.xmlBase64, 'base64');
+  // A aplicação decide onde guardar um arquivo NOVO; o original é preservado.
+  await writeFile(arquivoProcessadoPrivado, xmlProcessado, { flag: 'wx', mode: 0o600 });
+}
+```
+
+O sinal solicita o cancelamento da operação do SDK, sem cancelar a autorização fiscal. A consulta pode já ter sido enviada quando o sinal é acionado. Sem essa opção, chame `emissor.recuperarXml(xmlAssinado)`.
+
+Essa operação faz uma consulta externa pela chave extraída do XML, com A1. O motor confere a assinatura da NFe original, seu schema, sua identidade e seu ambiente; só devolve `nfeProc` depois de confirmar `cStat=100`, protocolo correlacionado e `digVal` presente e exatamente igual ao `DigestValue` assinado. Não assina novamente, não emite, não transmite a nota nem grava arquivos fiscais automaticamente. A NFe e sua assinatura original são preservadas, e essa assinatura é verificada antes e depois da composição do processo; o arquivo original continua sob controle da aplicação.
+
+Limitação da versão 0.2.0: se o `protNFe` recebido contiver uma assinatura XMLDSig (`ds:Signature`), a recuperação é recusada com `RECUPERACAO_NAO_COMPROVADA`, sem `xmlBase64` ou `protocolo`, mesmo com `cStat=100`. Esta versão não oferece verificação independente dessa assinatura adicional da SEFAZ. Nos protocolos aceitos, os dados vêm da resposta real da consulta e a prova por `digVal` continua obrigatória.
+
+Sem digest, com divergência ou com outro status, inclusive `150` e `217`, a recuperação não retorna XML processado nem protocolo. Confira o diagnóstico; não repita nem emita uma nova nota automaticamente para obter o arquivo. `envioIniciado=false` nessa operação não significa ausência de rede: a consulta externa ocorreu sem transmissão de nota ou evento.
+
+Atualize o pacote principal e o runtime da sua plataforma juntos. O manifesto do motor precisa anunciar `capabilities: ['recuperarXml']`; um runtime antigo é recusado com `RUNTIME_SEM_CAPACIDADE` antes de iniciar o processo. Veja o [contrato completo](docs/API.md#consulta-e-recuperação-do-xml) e o [exemplo de integração por arquivo](docs/examples/recuperar-xml.mjs), que não executa nenhuma operação ao ser importado. Os testes usam XML e A1 sintéticos com serviço SOAP local, sem SEFAZ real.
 
 ## Modelos e atualizações explícitas
 
 Nomes, grupos e enums espelham o ACBr. Construtores recebem objetos; coleções são arrays tipados e oferecem `New()`. Valores decimais são strings, preservando escala e evitando conversão binária pelo JavaScript. Datas são strings ISO civis, por exemplo `2026-10-08T12:30:00`; o ACBr aplica o fuso da UF na escrita do XML. Campos omitidos preservam os padrões do componente. Assinatura, protocolo e informações suplementares produzidas pelo motor não são entradas editáveis.
 
-A versão 0.1.2 acompanha a revisão SVN **48590**, com **204 tipos gerados** e contrato `e5a497cefe8e0e350a30da5cc04e88b35c38a98535893d52f878890260d1346d`. Revisão, inventário e hashes estão em `acbr.lock.json`; cliente e motor recusam contratos diferentes. Não há atualização automática dos fontes ao instalar.
+A versão 0.2.0 mantém a revisão SVN **48590**, com **204 tipos gerados** e contrato `e5a497cefe8e0e350a30da5cc04e88b35c38a98535893d52f878890260d1346d`. Revisão, inventário e hashes estão em `acbr.lock.json`; cliente e motor recusam contratos diferentes. Não há atualização automática dos fontes ao instalar.
 
 ```bash
 npx acbr-node init --revision 48590
