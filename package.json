@@ -1,6 +1,6 @@
 {
   "name": "cosmemilton-acbr-node",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "NF-e/NFC-e com ACBr Free Pascal, cliente TypeScript gerado e CLI SVN",
   "license": "LGPL-2.1-or-later",
   "type": "module",
@@ -55,8 +55,8 @@
     "test:help-installed": "node tests/cli-help-installed.mjs"
   },
   "optionalDependencies": {
-    "cosmemilton-acbr-node-linux-x64": "0.1.2",
-    "cosmemilton-acbr-node-win32-x64": "0.1.2"
+    "cosmemilton-acbr-node-linux-x64": "0.2.0",
+    "cosmemilton-acbr-node-win32-x64": "0.2.0"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

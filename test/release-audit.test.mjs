@@ -36,6 +36,13 @@ async function fixture(t, platform = 'linux') {
 test('release accepts complete matching Linux and Windows source/notices',async t=>{
  for(const platform of ['linux','win32']){const f=await fixture(t,platform);await auditGenerated(f.root,f.generated,f.lock);await f.audit();}
 });
+test('new recovery release requires the audited runtime capability',async t=>{
+ const f=await fixture(t);
+ await writeFile(path.join(f.directory,'package.json'),JSON.stringify({name:'cosmemilton-acbr-node-linux-x64',version:'0.2.0'}));
+ const audit=()=>auditRuntime(f.root,f.directory,'linux','0.2.0',f.generated,f.lock);
+ await assert.rejects(audit(),/capacidade recuperarXml/);
+ f.manifest.capabilities=['recuperarXml'];await f.saveManifest();await audit();
+});
 test('release refuses modified generated helper despite equal contract',async t=>{
  const f=await fixture(t);await writeFile(path.join(f.root,'native/generated/AcbrModels.pas'),'changed helper');await assert.rejects(auditGenerated(f.root,f.generated,f.lock),/Arquivo gerado alterado/);
 });

@@ -1,0 +1,5 @@
+# Release audits compare these sources byte for byte with Git checkouts.
+native/** text eol=lf
+generated/acbr/** text eol=lf
+/acbr.lock.json text eol=lf
+release/** text eol=lf

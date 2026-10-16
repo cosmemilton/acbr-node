@@ -1,7 +1,7 @@
 export const PROTOCOL_VERSION = 1 as const;
 export type Modelo = 55 | 65;
 export type Ambiente = 1 | 2;
-export type Comando = 'gerarXml' | 'validar' | 'assinar' | 'transmitir' | 'consultar' | 'cancelar' | 'cartaCorrecao' | 'inutilizar';
+export type Comando = 'gerarXml' | 'validar' | 'assinar' | 'transmitir' | 'consultar' | 'recuperarXml' | 'cancelar' | 'cartaCorrecao' | 'inutilizar';
 export interface Contrato { sourceRevision: number; contractHash: string }
 export interface CertificadoA1 { pfx?: Uint8Array; arquivo?: string; senha: string }
 export interface ConfiguracaoEmissor { cnpj: string; uf: string; modelo: Modelo; ambiente: Ambiente; certificado?: CertificadoA1; csc?: { id: string; valor: string } }
@@ -12,7 +12,7 @@ export interface RequisicaoMotor extends Contrato {
   protocolo?: string; justificativa?: string; correcao?: string; sequenciaEvento?: number;
   inutilizacao?: { ano: number; serie: number; numeroInicial: number; numeroFinal: number };
 }
-export type Estado = 'DENEGADO' | 'XML_GERADO' | 'VALIDADO' | 'ASSINADO' | 'AUTORIZADO' | 'REJEITADO' | 'PENDENTE' | 'INDETERMINADO' | 'CONSULTADO' | 'CANCELADO' | 'EVENTO_REGISTRADO' | 'INUTILIZADO' | 'ERRO';
+export type Estado = 'DENEGADO' | 'XML_GERADO' | 'VALIDADO' | 'ASSINADO' | 'XML_RECUPERADO' | 'AUTORIZADO' | 'REJEITADO' | 'PENDENTE' | 'INDETERMINADO' | 'CONSULTADO' | 'CANCELADO' | 'EVENTO_REGISTRADO' | 'INUTILIZADO' | 'ERRO';
 export interface ResultadoFiscal extends Contrato {
   versao: 1; id: string; sucesso: boolean; estado: Estado; codigo?: string;
   cStat?: number; xMotivo?: string; chave?: string; protocolo?: string; recibo?: string;
@@ -22,6 +22,8 @@ export interface ResultadoFiscal extends Contrato {
 }
 export interface RuntimeManifest extends Contrato {
   formatVersion: 1; platform: string; arch: string; executable: string; files: Record<string, string>;
+  /** Operações adicionais anunciadas pelo motor, sem alterar o protocolo-base. */
+  capabilities?: readonly string[];
 }
 export interface OpcoesOperacao { signal?: AbortSignal }
 export interface Consulta { chave: string; recibo?: string }

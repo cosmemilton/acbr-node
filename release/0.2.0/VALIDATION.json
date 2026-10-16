@@ -1,0 +1,307 @@
+{
+  "formatVersion": 1,
+  "version": "0.2.0",
+  "validationStatus": "passed",
+  "publication": "authorized",
+  "publicationState": "not-published",
+  "preparedAt": "2026-10-16T22:41:35.1853689Z",
+  "sourceRevision": 48590,
+  "sourceHash": "6b768e4f45b4092d040f7576d6fb799d8b66b45ae29a0902c37334fb7c5c6816",
+  "contractHash": "e5a497cefe8e0e350a30da5cc04e88b35c38a98535893d52f878890260d1346d",
+  "generatedModels": 204,
+  "checks": {
+    "windowsSdk": {
+      "tests": 138,
+      "passed": 133,
+      "failed": 0,
+      "skipped": 5,
+      "evidence": "acbr-node-recovery/.acbr/test-windows.log"
+    },
+    "linuxSdk": {
+      "tests": 138,
+      "passed": 134,
+      "failed": 0,
+      "skipped": 4,
+      "evidence": "acbr-node-recovery/.acbr/test-linux.log"
+    },
+    "windowsNative": {
+      "tests": 99,
+      "passed": 99,
+      "failed": 0,
+      "skipped": 0,
+      "components": [
+        {
+          "tests": 29,
+          "passed": 29,
+          "failed": 0,
+          "skipped": 0,
+          "evidence": "acbr-node-recovery/.acbr/test-native-windows-offline-tls-final.log"
+        },
+        {
+          "tests": 70,
+          "passed": 70,
+          "failed": 0,
+          "skipped": 0,
+          "evidence": "acbr-node-recovery/.acbr/test-native-windows-soap-harness-final.log"
+        }
+      ]
+    },
+    "linuxNative": {
+      "tests": 99,
+      "passed": 99,
+      "failed": 0,
+      "skipped": 0,
+      "evidence": "acbr-node-recovery/.acbr/test-native-linux-harness-final.log"
+    },
+    "installedPackage": {
+      "win32": {
+        "status": "passed",
+        "node": "v24.18.0",
+        "stageExitCodes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "mainSha256": "f292cf36fe483a5b0c19879e9755831d48e93e496d2da1275e388b51ac3aa067",
+        "runtimeSha256": "60b58b9745af5414af19d8087a86af7a00e7d012b51d8d6a3181003b41d3ce83",
+        "native": [
+          {
+            "kind": "esm",
+            "fixtures": 4,
+            "offlineOperations": 12,
+            "compilerPathAbsent": true,
+            "sourceCheckoutUnusedByRuntime": true
+          },
+          {
+            "kind": "cjs",
+            "fixtures": 4,
+            "offlineOperations": 12,
+            "compilerPathAbsent": true,
+            "sourceCheckoutUnusedByRuntime": true
+          }
+        ],
+        "recoveryApiGates": [
+          {
+            "kind": "esm",
+            "capabilityChecks": 6,
+            "malformedMetadataChecks": 6,
+            "inputChecks": 4,
+            "supportedDispatchSentinels": 2,
+            "workerLaunchAttempts": 0,
+            "subprocessAttempts": 0,
+            "networkAttempts": 0
+          },
+          {
+            "kind": "cjs",
+            "capabilityChecks": 6,
+            "malformedMetadataChecks": 6,
+            "inputChecks": 4,
+            "supportedDispatchSentinels": 2,
+            "workerLaunchAttempts": 0,
+            "subprocessAttempts": 0,
+            "networkAttempts": 0
+          }
+        ],
+        "help": {
+          "checks": 6,
+          "passed": 6,
+          "optionalRuntimesInstalled": false,
+          "measuredNodeApiAttempts": {
+            "subprocessAttempts": 0,
+            "networkAttempts": 0,
+            "forbiddenReadAttempts": 0,
+            "writeAttempts": 0
+          },
+          "cliShim": "passed"
+        },
+        "evidence": "recovery-package-evidence/installed-win32-0.2.0-final-opcoes/matrix-summary.json"
+      },
+      "linux": {
+        "status": "passed",
+        "node": "v24.15.0",
+        "stageExitCodes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "mainSha256": "f292cf36fe483a5b0c19879e9755831d48e93e496d2da1275e388b51ac3aa067",
+        "runtimeSha256": "d2beccbcf31820ebfc49ce0e246b8fe500f5757df458a0985cd09745ea369c45",
+        "native": [
+          {
+            "kind": "esm",
+            "fixtures": 4,
+            "offlineOperations": 12,
+            "compilerPathAbsent": true,
+            "sourceCheckoutUnusedByRuntime": true
+          },
+          {
+            "kind": "cjs",
+            "fixtures": 4,
+            "offlineOperations": 12,
+            "compilerPathAbsent": true,
+            "sourceCheckoutUnusedByRuntime": true
+          }
+        ],
+        "recoveryApiGates": [
+          {
+            "kind": "esm",
+            "capabilityChecks": 6,
+            "malformedMetadataChecks": 6,
+            "inputChecks": 4,
+            "supportedDispatchSentinels": 2,
+            "workerLaunchAttempts": 0,
+            "subprocessAttempts": 0,
+            "networkAttempts": 0
+          },
+          {
+            "kind": "cjs",
+            "capabilityChecks": 6,
+            "malformedMetadataChecks": 6,
+            "inputChecks": 4,
+            "supportedDispatchSentinels": 2,
+            "workerLaunchAttempts": 0,
+            "subprocessAttempts": 0,
+            "networkAttempts": 0
+          }
+        ],
+        "help": {
+          "checks": 6,
+          "passed": 6,
+          "optionalRuntimesInstalled": false,
+          "measuredNodeApiAttempts": {
+            "subprocessAttempts": 0,
+            "networkAttempts": 0,
+            "forbiddenReadAttempts": 0,
+            "writeAttempts": 0
+          },
+          "cliShim": "passed"
+        },
+        "evidence": "recovery-package-evidence/installed-linux-0.2.0-final-opcoes/matrix-summary.json"
+      }
+    },
+    "generatedClient": {
+      "sourceRevision": 48590,
+      "models": 204,
+      "sourceHash": "6b768e4f45b4092d040f7576d6fb799d8b66b45ae29a0902c37334fb7c5c6816",
+      "contractHash": "e5a497cefe8e0e350a30da5cc04e88b35c38a98535893d52f878890260d1346d",
+      "evidence": "acbr-node-recovery/.acbr/generated/manifest.json"
+    },
+    "javascriptBundles": {
+      "status": "rebuilt",
+      "evidence": "acbr-node-recovery/.acbr/sdk-build-final.log"
+    },
+    "artifactPins": {
+      "status": "passed",
+      "artifacts": 3,
+      "mainSha256": "f292cf36fe483a5b0c19879e9755831d48e93e496d2da1275e388b51ac3aa067",
+      "evidence": "acbr-node-recovery/.acbr/release-artifact-hashes.json"
+    },
+    "npmDryRun": {
+      "status": "passed",
+      "exitCodeReportedByController": 0,
+      "evidence": "acbr-node-recovery/.acbr/main-final-dry-run.log"
+    },
+    "optionalDependencyCi": {
+      "status": "passed-with-consistent-lock",
+      "ignoreScripts": true,
+      "missingEntriesOriginalExitCode": 1,
+      "consistentLockExitCode": 0,
+      "unpublishedOptional404Ignored": true,
+      "sourceNodeModulesModified": false,
+      "evidence": "recovery-package-evidence/ci-consistent-optional-20261016-181923/npm-ci.metadata.json"
+    },
+    "pullRequestCi": "required-before-release-merge"
+  },
+  "nativeBuild": {
+    "rebuiltForVersion": "0.2.0",
+    "reusedOlderWorker": false,
+    "capabilities": [
+      "recuperarXml"
+    ],
+    "windowsRuntimeFiles": 242,
+    "linuxRuntimeFiles": 252,
+    "publicSourceAndDependencyCachesReused": true
+  },
+  "realHomologation": {
+    "status": "passed",
+    "scope": "Human-executed homologation emission and public SDK 0.2.0 recovery; subsequent sanitized read-only verification",
+    "emission": {
+      "status": "AUTORIZADO_100_ALVO_SEM_PROTOCOLO_CONFERIDO",
+      "cStat": 100,
+      "authorizationConfirmed": true,
+      "originalSignedXmlPreserved": true,
+      "targetXmlWithoutProtocol": true,
+      "fiscalResponseStoredSeparately": true,
+      "responseXsdValidated": true,
+      "privateHashesChecked": true,
+      "uncertain": false,
+      "evidence": "real-validation-note9/resultado-emissao9-observado.json"
+    },
+    "recovery": {
+      "status": "SDK_0_2_0_RECUPEROU_XML_100_CONFERIDO",
+      "cStat": 100,
+      "publicApiCalled": true,
+      "confirmed": true,
+      "sdkXmlChecked": true,
+      "xmlAssembledByRunner": false,
+      "earlierResponseProtocolUsed": false,
+      "originalWithoutProtocolPreserved": true,
+      "originalNfeSignaturePreserved": true,
+      "originalNfeSignatureVerifiedByWorker": true,
+      "digValCorrelated": true,
+      "nfeProcXsdValidatedLocally": true,
+      "privateHashesChecked": true,
+      "uncertain": false,
+      "evidence": "real-validation-note9/resultado-recuperacao9-observado.json"
+    },
+    "readOnlyRecoveryVerification": {
+      "exitCodeReportedByController": 0,
+      "certificateRead": false,
+      "sdkLoaded": false,
+      "externalCall": false,
+      "fiscalFilesModified": false
+    }
+  },
+  "networkTransmission": true,
+  "networkTransmissionScope": "Human-executed homologation emission only; synthetic installed-package operations were offline and read-only result verification made no external call",
+  "limitations": [
+    "Version 0.2.0 rejects a protNFe containing XMLDSig Signature with RECUPERACAO_NAO_COMPROVADA, without recovery XML or protocol, even for cStat100 and regardless of that additional signature validity.",
+    "The original NFe signature is verified before and after composition; accepted protocols require digVal to equal the signed DigestValue. The additional protocol signature is not independently verified or preserved.",
+    "Installed recovery API gates prove exports, capability admission/rejection and local checks with inert sentinels. The separate sanitized real-homologation receipt is the evidence of the real recovery.",
+    "CLI side-effect counters cover the instrumented Node APIs; harness receipt writes are excluded.",
+    "Windows native99 is the sum of29 offline/TLS tests and70 localhost SOAP tests; it is not an additional99-case run.",
+    "General suites include skipped integration groups exercised separately. Local validation is not a remote CI result or an npm publication receipt."
+  ],
+  "publicSourceReferences": [
+    "README.md:87",
+    "docs/API.md:39-49",
+    "docs/ARQUITETURA.md:17",
+    "native/NativeRecovery.pas:224-237",
+    "native/NativeMotor.pas:184-204"
+  ],
+  "evidenceScope": "Relative public/sanitized evidence references only; no private fiscal identifiers, XML, certificate contents, private paths or real-document hashes included",
+  "publicationTransport": {
+    "type": "reviewed-https-bundle",
+    "status": "pending-public-assets"
+  },
+  "artifacts": [
+    {
+      "file": "cosmemilton-acbr-node-linux-x64-0.2.0.tgz",
+      "bytes": 51633932,
+      "sha256": "d2beccbcf31820ebfc49ce0e246b8fe500f5757df458a0985cd09745ea369c45"
+    },
+    {
+      "file": "cosmemilton-acbr-node-win32-x64-0.2.0.tgz",
+      "bytes": 33715213,
+      "sha256": "60b58b9745af5414af19d8087a86af7a00e7d012b51d8d6a3181003b41d3ce83"
+    },
+    {
+      "file": "cosmemilton-acbr-node-0.2.0.tgz",
+      "bytes": 691834,
+      "sha256": "f292cf36fe483a5b0c19879e9755831d48e93e496d2da1275e388b51ac3aa067"
+    }
+  ],
+  "publicationAuthorizedOn": "2026-10-16"
+}

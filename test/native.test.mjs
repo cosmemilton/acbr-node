@@ -5,7 +5,7 @@ import {spawn}from'node:child_process';
 import {fileURLToPath}from'node:url';
 import path from'node:path';
 import os from'node:os';
-import {certificado,documento,objetoDocumento,CNPJ,PASSWORD}from'./native-fixtures.mjs';
+import {certificado,documento,objetoDocumento,CNPJ,PASSWORD,partesAssinadas,comAspasSimples,comComplemento}from'./native-fixtures.mjs';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const enabled=process.env.ACBR_NATIVE_TEST==='1';
 const runtime=process.env.ACBR_NODE_RUNTIME_DIR??path.join(root,'.acbr','runtime',process.platform+'-'+process.arch);
@@ -69,6 +69,26 @@ test('ACBr real offline NF-e/NFC-e: A1, XML, identidade e protocolo',{skip:!enab
   const signed=await offline('assinar',55);
   const xml=Buffer.from(signed.xmlBase64,'base64').toString('utf8').replace('Café São José','Café São João');
   const invalid=await offline('validar',55,{xmlBase64:Buffer.from(xml).toString('base64')});assert.equal(invalid.codigo,'ASSINATURA_INVALIDA');
+ });
+ await t.test('assinatura sintética continua válida com delimitadores em aspas simples',async()=>{
+  const fixture=comComplemento(documento(55),"TESTE D'AGUA SINTETICO & OFFLINE");
+  const signed=await offline('assinar',55,fixture);assert.equal(signed.estado,'ASSINADO',signed.codigo);
+  const xmlBase64=comAspasSimples(signed.xmlBase64),parts=partesAssinadas(xmlBase64);
+  assert.match(parts.assinatura,/='/);assert.match(parts.nfe,/D(?:'|&apos;)AGUA/);
+  assert.equal(parts.digest,partesAssinadas(signed.xmlBase64).digest);
+  const valid=await offline('validar',55,{xmlBase64,chave:signed.chave});
+  assert.equal(valid.estado,'VALIDADO',valid.codigo);
+ });
+ await t.test('conteúdo reassinado pode manter a chave mas muda o digest autenticado',async()=>{
+  const fixture=documento(55);
+  const original=await offline('assinar',55,fixture);assert.equal(original.estado,'ASSINADO',original.codigo);
+  const changed=await offline('assinar',55,comComplemento(fixture,'OUTRO CONTEUDO SINTETICO COM A MESMA CHAVE'));
+  assert.equal(changed.estado,'ASSINADO',changed.codigo);assert.equal(changed.chave,original.chave);
+  assert.notEqual(partesAssinadas(changed.xmlBase64).digest,partesAssinadas(original.xmlBase64).digest);
+  for(const signed of[original,changed]){
+   const valid=await offline('validar',55,{xmlBase64:signed.xmlBase64,chave:signed.chave});
+   assert.equal(valid.estado,'VALIDADO',valid.codigo);
+  }
  });
  await t.test('recusa senha errada e nunca a devolve',async()=>{
   const cert=certificado();cert.senha='secret-password-must-not-appear';const result=await offline('assinar',55,{config:{...config,certificado:cert}});
