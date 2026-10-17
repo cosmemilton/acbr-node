@@ -30,6 +30,22 @@ export interface FieldDescription {
   itemType?: string;
   members?: { name: string; kind: ModelProperty['kind']; pascalType: string; readonly: boolean }[];
 }
+export interface TypeDescription {
+  formatVersion: 1;
+  sdkVersion: string;
+  sourceRevision: number;
+  sourceHash: string;
+  contractHash: string;
+  root: string;
+  name: string;
+  kind: ModelType['kind'];
+  pascalType: string;
+  inputType: 'string' | 'object' | 'array';
+  values?: string[];
+  itemType?: string;
+  members?: FieldDescription['members'];
+}
+export type TargetDescription = FieldDescription | TypeDescription;
 export class FieldHelpError extends Error {
   constructor(public readonly code: string, message: string, public readonly details?: { segment?: string; ownerType?: string; candidates?: string[] }) { super(message); this.name = 'FieldHelpError'; }
 }
@@ -142,7 +158,22 @@ export function describeField(metadata: ContractMetadata, sdkVersion: string, qu
   return description;
 }
 
-export async function describeInstalledField(query: string, packageRoot: string): Promise<FieldDescription> {
+export function describeTarget(metadata: ContractMetadata, sdkVersion: string, query?: string): TargetDescription {
+  validateContractMetadata(metadata);
+  query ??= metadata.ir.root;
+  const node = metadata.ir.types.find(type => type.name === query);
+  if (!node) return describeField(metadata, sdkVersion, query);
+  const description: TypeDescription = { formatVersion: 1, sdkVersion, sourceRevision: metadata.sourceRevision,
+    sourceHash: metadata.sourceHash, contractHash: metadata.contractHash, root: metadata.ir.root,
+    name: node.name, kind: node.kind, pascalType: node.name,
+    inputType: node.kind === 'enum' ? 'string' : node.kind === 'list' ? 'array' : 'object' };
+  if (node.kind === 'enum') description.values = [...node.values!];
+  if (node.kind === 'list') description.itemType = node.item;
+  if (node.kind === 'object') description.members = node.properties!.map(item => ({ name: item.name, kind: item.kind, pascalType: item.type, readonly: item.readonly }));
+  return description;
+}
+
+async function installedContract(packageRoot: string): Promise<{ metadata: ContractMetadata; sdkVersion: string }> {
   let metadata: ContractMetadata, pkg: { version: string }, lock: { source: { revision: number; treeHash: string } };
   try {
     [metadata, pkg, lock] = await Promise.all(['dist/contract.json', 'package.json', 'acbr.lock.json'].map(async filename => JSON.parse(await readFile(path.join(packageRoot, filename), 'utf8')))) as [ContractMetadata, typeof pkg, typeof lock];
@@ -152,7 +183,26 @@ export async function describeInstalledField(query: string, packageRoot: string)
       metadata.sourceRevision !== lock.source?.revision || metadata.sourceHash !== lock.source?.treeHash ||
       metadata.sourceRevision !== ACBR_CONTRACT.sourceRevision || metadata.contractHash !== ACBR_CONTRACT.contractHash)
     throw new FieldHelpError('CONTRATO_INCOMPATIVEL', 'Os metadados divergem da versão instalada, do lock ou do validador gerado.');
-  return describeField(metadata, pkg.version, query);
+  return { metadata, sdkVersion: pkg.version };
+}
+
+export async function describeInstalledField(query: string, packageRoot: string): Promise<FieldDescription> {
+  const { metadata, sdkVersion } = await installedContract(packageRoot);
+  return describeField(metadata, sdkVersion, query);
+}
+
+export async function describeInstalledTarget(query: string | undefined, packageRoot: string): Promise<TargetDescription> {
+  const { metadata, sdkVersion } = await installedContract(packageRoot);
+  return describeTarget(metadata, sdkVersion, query);
+}
+
+export async function installedSdkVersion(packageRoot: string): Promise<string> {
+  let pkg: { version?: unknown };
+  try { pkg = JSON.parse(await readFile(path.join(packageRoot, 'package.json'), 'utf8')); }
+  catch { throw new FieldHelpError('VERSAO_INDISPONIVEL', 'Não foi possível ler a versão do pacote instalado.'); }
+  if (!pkg || typeof pkg.version !== 'string' || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(pkg.version))
+    throw new FieldHelpError('VERSAO_INDISPONIVEL', 'A versão do pacote instalado é inválida.');
+  return pkg.version;
 }
 
 export function formatFieldDescription(description: FieldDescription): string {
@@ -161,6 +211,16 @@ export function formatFieldDescription(description: FieldDescription): string {
   if (description.values) lines.push(`Valores permitidos na API: ${description.values.join(', ')}`);
   if (description.declaredDefault !== undefined) lines.push(`Padrão declarado no Pascal: ${description.declaredDefault} (não substitui regras fiscais ou o construtor nativo).`);
   if (description.constraints) lines.push(`Limites do tipo: ${JSON.stringify(description.constraints)}`);
+  if (description.itemType) lines.push(`Tipo do elemento: ${description.itemType}`);
+  if (description.members) lines.push(`Campos: ${description.members.map(member => member.name).join(', ')}`);
+  lines.push(`SDK: ${description.sdkVersion}; revisão ACBr: ${description.sourceRevision}`, `Contrato: ${description.contractHash}`);
+  return lines.join('\n');
+}
+
+export function formatTargetDescription(description: TargetDescription): string {
+  if ('path' in description) return formatFieldDescription(description);
+  const lines = [`Tipo: ${description.name} (${description.kind}; entrada ${description.inputType})`];
+  if (description.values) lines.push(`Valores permitidos na API: ${description.values.join(', ')}`);
   if (description.itemType) lines.push(`Tipo do elemento: ${description.itemType}`);
   if (description.members) lines.push(`Campos: ${description.members.map(member => member.name).join(', ')}`);
   lines.push(`SDK: ${description.sdkVersion}; revisão ACBr: ${description.sourceRevision}`, `Contrato: ${description.contractHash}`);

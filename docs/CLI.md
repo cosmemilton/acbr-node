@@ -1,8 +1,18 @@
 # Fontes, contrato e build
 
-## Help de tipos e campos — implementação de desenvolvimento
+## Ajuda de tipos e campos
 
-O help TAG foi introduzido na release 0.1.2 e permanece na 0.2.0 descrita nesta documentação. A disponibilidade da 0.2.0 no npm só é anunciada após a confirmação dessa versão no registry.
+O SDK 0.2.2 acrescenta `describe TARGET`, com texto em português e `--json`, além de `--version` e ajuda global ou por subcomando. Os runtimes permanecem na versão 0.2.1, sem recompilação do motor. O `help TAG`, introduzido na 0.1.2, conserva seu formato e comportamento.
+
+```sh
+node dist/cli.js --version
+node dist/cli.js --help
+node dist/cli.js describe --help
+node dist/cli.js describe Ide.tpNF
+node dist/cli.js describe TTipoNFe --json
+```
+
+`describe` aceita um caminho de campo ou nome de tipo do contrato; sem argumento consulta `TNFe`. O formato JSON anterior de campos permanece disponível em `help TAG`:
 
 ```sh
 node dist/cli.js help TAG Ide.tpNF
@@ -14,7 +24,7 @@ node dist/cli.js help TAG 'TNFe.Det[0].Prod.DI[].adi[2].nAdicao' --json
 
 O prefixo `TNFe.` é opcional. Os nomes dos campos respeitam maiúsculas e minúsculas; `TAG` aceita ambas. `[]` consulta o tipo do elemento de uma coleção. Um índice não negativo, como `[0]`, é normalizado para `[]`: a consulta não lê uma nota nem confere a quantidade de itens. Um nome curto só é aceito quando identifica um caminho único; `CST` retorna `CAMPO_AMBIGUO` com os caminhos possíveis. `Det.Imposto` pede um seletor de coleção, enquanto `Ide[]` é recusado por não ser coleção.
 
-O help lê somente `dist/contract.json`, `package.json` e `acbr.lock.json` da própria instalação. Não consulta configuração do consumidor, runtime, certificado, SVN ou rede e funciona sem dependências opcionais. `--config` e `--revision` não se aplicam a esse comando. Saída JSON contém versão do SDK, revisão ACBr, hashes, caminho canônico, tipo, referências, valores, limites do tipo e indicação de somente leitura. Erros JSON vão para `stderr`, com código de saída 1; uma consulta válida termina com 0.
+O help lê somente `dist/contract.json`, `package.json` e `acbr.lock.json` da própria instalação. Não consulta configuração do consumidor, runtime, certificado, SVN ou rede e funciona sem dependências opcionais. `--config` e `--revision` não se aplicam a `describe` ou `help TAG`. O JSON de campo contém versão do SDK, revisão ACBr, hashes, caminho canônico, tipo, referências, valores, limites do tipo e indicação de somente leitura. O JSON de tipo identifica o tipo por `name`, sem atribuir a ele o padrão ou a condição de somente leitura de um campo. Erros JSON vão para `stderr`, com código de saída 1; uma consulta válida termina com 0. Veja [Ajuda de campos e tipos](ajuda.md) para os comandos e formatos completos.
 
 Os caminhos pertencem ao modelo de entrada do SDK, não são XPath/XML. Por exemplo, o modelo usa `Ide.dEmi`; `Ide.dhEmi` é inexistente. `declaredDefault` é a declaração Pascal, não uma garantia sobre o construtor nativo. Limites primitivos, enums e campos opcionais do TypeScript não substituem regras fiscais, códigos XML, obrigatoriedade ou orientação tributária.
 

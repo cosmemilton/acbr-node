@@ -2,6 +2,20 @@
 
 `criarEmissor` retorna operações assíncronas; cada chamada inicia um processo fiscal isolado. Uma instância processa uma operação por vez, com fila limitada. Emitentes diferentes não compartilham o componente Pascal.
 
+## Consultar campos e tipos pela CLI
+
+O SDK 0.2.2 acrescenta `acbr-node describe TARGET`, com saída legível em português, e `--json` para consultar os mesmos metadados em formato estruturado:
+
+```bash
+npx acbr-node describe Ide.tpNF
+npx acbr-node describe TTipoNFe --json
+npx acbr-node describe 'Det[].Imposto.PIS.CST' --json
+npx acbr-node describe --help
+npx acbr-node --version
+```
+
+Os valores de enums, nomes, tipos e padrões declarados vêm do contrato gerado que acompanha o SDK. A consulta funciona sem runtime, certificado ou rede, não cria emissor e não inicia processo fiscal. `help TAG caminho [--json]` conserva o comportamento anterior. A API fiscal e seu contrato permanecem iguais; o SDK 0.2.2 utiliza os runtimes 0.2.1. Veja [Ajuda de campos e tipos](ajuda.md) para caminhos, coleções, formato JSON e canais de saída.
+
 ## Configuração
 
 Campos obrigatórios: `cnpj` (14 dígitos), `uf`, `modelo` (55/65), `ambiente` (1 produção, 2 homologação). Certificado A1: `certificado: { pfx: Uint8Array, senha: string }` ou `{ arquivo: string, senha: string }`. NFC-e requer `csc: { id: string, valor: string }` para os recursos que dependem do CSC.
@@ -50,7 +64,7 @@ Para status diferente de `100`, inclusive `150` e `217`, a nova operação devol
 
 Essa consulta é uma operação de rede. `envioIniciado=false` informa que não se iniciou transmissão de nota ou evento; não informa que a operação foi offline. A recuperação não chama `assinar`, `transmitir`, eventos ou inutilização, não tenta emitir novamente e não persiste nem substitui arquivos fiscais. A aplicação decide onde salvar os bytes devolvidos e deve preservar o arquivo assinado original. O exemplo em [examples/recuperar-xml.mjs](examples/recuperar-xml.mjs) deixa essa gravação para o chamador e não inicia consulta ao ser importado.
 
-Atualize SDK e runtime da plataforma em conjunto. Para essa operação, o manifesto precisa incluir `capabilities: ['recuperarXml']`, além dos demais campos e hashes. Um motor sem essa capacidade é recusado com `RUNTIME_SEM_CAPACIDADE` antes de iniciar o processo; não basta reaproveitar um binário antigo com o mesmo contrato dos modelos. A adição mantém a versão 1 do protocolo JSONL e não muda `consultar`.
+Use SDK e runtime compatíveis; o SDK 0.2.2 utiliza os runtimes 0.2.1. Para essa operação, o manifesto precisa incluir `capabilities: ['recuperarXml']`, além dos demais campos e hashes. Um motor sem essa capacidade é recusado com `RUNTIME_SEM_CAPACIDADE` antes de iniciar o processo; não basta reaproveitar um binário antigo com o mesmo contrato dos modelos. A adição mantém a versão 1 do protocolo JSONL e não muda `consultar`.
 
 `validar(xml)` continua recebendo uma NFe sem envelope. Para verificar um `nfeProc` recebido ou salvo pela aplicação, use seu schema de processo (`procNFe_v4.00.xsd`), não `validar(nfeProc)`. Na recuperação, a validação do processo e a conferência da assinatura original da NFe já são responsabilidade do motor, com a limitação sobre assinatura adicional do protocolo descrita acima.
 

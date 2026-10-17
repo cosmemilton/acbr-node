@@ -9,22 +9,41 @@ Requisitos de execução: Node.js 22.12 ou superior e Linux x64 Ubuntu 24.04/gli
 ## Instalação e uso
 
 ```bash
-npm install cosmemilton-acbr-node
+npm install cosmemilton-acbr-node@0.2.2
 ```
 
 O npm instala o runtime opcional da sua plataforma. Não use `--omit=optional` na instalação final. Também é possível informar `runtimeDirectory` para um motor próprio.
 
-Esta documentação descreve a versão 0.2.1, preparada localmente para completar os textos de licenças distribuídos com os runtimes. O motor fiscal é o mesmo da 0.2.0, que adicionou `recuperarXml`, e o help TAG da 0.1.2 continua disponível. A disponibilidade da 0.2.1 no npm depende de publicação e confirmação posteriores no registry.
+O SDK 0.2.2 acrescenta consultas de campos e tipos à ajuda da CLI. Ele usa os runtimes 0.2.1, sem recompilar o motor, alterar o contrato fiscal ou mudar as operações da API. O `help TAG` da 0.1.2 continua disponível.
 
 Para instalar tarballs revisados em um projeto separado, informe o SDK e o runtime da plataforma:
 
 ```bash
 npm install --offline --ignore-scripts --no-audit --no-fund \
-  /caminho/cosmemilton-acbr-node-0.2.1.tgz \
+  /caminho/cosmemilton-acbr-node-0.2.2.tgz \
   /caminho/cosmemilton-acbr-node-linux-x64-0.2.1.tgz
 ```
 
 No Windows, selecione `cosmemilton-acbr-node-win32-x64-0.2.1.tgz`.
+
+## Ajuda de campos e tipos
+
+Com o pacote instalado no projeto, consulte o contrato da própria versão:
+
+```bash
+npx acbr-node --version
+npx acbr-node --help
+npx acbr-node describe --help
+npx acbr-node describe Ide.tpNF
+npx acbr-node describe TTipoNFe
+npx acbr-node describe TTipoNFe --json
+```
+
+`describe` mostra texto em português; `--json` fornece metadados estruturados. `Ide.tpNF` é um campo, e `TTipoNFe` é seu tipo enum. Ambos apresentam `tnEntrada` e `tnSaida`, lidos do contrato gerado; o padrão declarado `tnSaida` pertence ao campo. Não é necessário instalar o runtime opcional, carregar certificado ou acessar a rede para essa consulta. Os comandos de ajuda não executam o motor.
+
+O comando anterior `npx acbr-node help TAG Ide.tpNF [--json]` permanece compatível, inclusive o JSON. [Caminhos, coleções, tipos e códigos de saída](docs/ajuda.md).
+
+## Exemplo de uso da API
 
 ```ts
 import { writeFile } from 'node:fs/promises';
@@ -88,7 +107,7 @@ Limitação da versão 0.2.0: se o `protNFe` recebido contiver uma assinatura XM
 
 Sem digest, com divergência ou com outro status, inclusive `150` e `217`, a recuperação não retorna XML processado nem protocolo. Confira o diagnóstico; não repita nem emita uma nova nota automaticamente para obter o arquivo. `envioIniciado=false` nessa operação não significa ausência de rede: a consulta externa ocorreu sem transmissão de nota ou evento.
 
-Atualize o pacote principal e o runtime da sua plataforma juntos. O manifesto do motor precisa anunciar `capabilities: ['recuperarXml']`; um runtime antigo é recusado com `RUNTIME_SEM_CAPACIDADE` antes de iniciar o processo. Veja o [contrato completo](docs/API.md#consulta-e-recuperação-do-xml) e o [exemplo de integração por arquivo](docs/examples/recuperar-xml.mjs), que não executa nenhuma operação ao ser importado. Os testes usam XML e A1 sintéticos com serviço SOAP local, sem SEFAZ real.
+Use o pacote principal com um runtime compatível da sua plataforma; o SDK 0.2.2 utiliza os runtimes 0.2.1. O manifesto do motor precisa anunciar `capabilities: ['recuperarXml']`; um runtime antigo é recusado com `RUNTIME_SEM_CAPACIDADE` antes de iniciar o processo. Veja o [contrato completo](docs/API.md#consulta-e-recuperação-do-xml) e o [exemplo de integração por arquivo](docs/examples/recuperar-xml.mjs), que não executa nenhuma operação ao ser importado. Os testes usam XML e A1 sintéticos com serviço SOAP local, sem SEFAZ real.
 
 ## Modelos e atualizações explícitas
 
