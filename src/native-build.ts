@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import type { AcbrConfig } from './config.js';
 import { fileHash, runCommand, snapshotSource, verifySource } from './source.js';
+import { completeRuntimeLicenses, auditRuntimeLicenses } from '../scripts/runtime-license-inventory.mjs';
 
 export interface BuiltRuntimeManifest {
   formatVersion: 1; sourceRevision: number; contractHash: string; platform: string; arch: string;
@@ -189,9 +190,11 @@ export async function buildNative(config: AcbrConfig, options: { testOnly?: bool
         Object.entries(contract.fileHashes).some(([name, hash]) => currentGenerated.fileHashes[name] !== hash)) throw new Error('Arquivos gerados mudaram durante a compilação. Execute build novamente.');
     const currentSource = await verifySource(config);
     if (currentSource.source.revision !== lock.source.revision || currentSource.source.treeHash !== lock.source.treeHash) throw new Error('Fontes ACBr foram atualizadas durante a compilação. Execute generate e build novamente.');
+    await completeRuntimeLicenses(stage);
     const files = (await snapshotSource(stage)).files;
     const manifest: BuiltRuntimeManifest = { formatVersion: 1, sourceRevision: lock.source.revision, contractHash: contract.contractHash,
       platform: process.platform, arch: process.arch, executable, files, generatedFileHashes: contract.fileHashes, capabilities: ['recuperarXml'], systemDependencies, ...(options.testOnly ? { testOnly: true } : {}) };
+    await auditRuntimeLicenses(stage, manifest);
     await writeFile(join(stage, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
     await replaceRuntime(stage, target);
     return manifest;
@@ -234,6 +237,7 @@ export async function checkBuild(config: AcbrConfig): Promise<BuiltRuntimeManife
     if (path.startsWith('/') || path.includes('\\') || path.split('/').includes('..') || !/^[a-f0-9]{64}$/.test(expected)) throw new Error(`Caminho/hash inválido no runtime: ${path}.`);
     if (await fileHash(join(directory, path)) !== expected) throw new Error(`Hash inválido no runtime: ${path}.`);
   }
+  await auditRuntimeLicenses(directory, manifest);
   return manifest;
 }
 export interface DoctorItem { name: string; ok: boolean; detail: string; }

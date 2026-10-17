@@ -1,0 +1,339 @@
+{
+  "formatVersion": 1,
+  "version": "0.2.1",
+  "validationStatus": "passed",
+  "publication": "authorized",
+  "publicationState": "not-published",
+  "preparedAt": "2026-10-17T13:30:31.839Z",
+  "sourceCommit": "1f4ac0c5567d3a2204da7cd3c45109c8aa461db8",
+  "sourceRevision": 48590,
+  "sourceHash": "6b768e4f45b4092d040f7576d6fb799d8b66b45ae29a0902c37334fb7c5c6816",
+  "contractHash": "e5a497cefe8e0e350a30da5cc04e88b35c38a98535893d52f878890260d1346d",
+  "generatedModels": 204,
+  "scope": "Packaging-only license completeness and audit correction; worker binaries, existing runtime payloads, fiscal behavior, public API bundles and model contract are unchanged from 0.2.0.",
+  "checks": {
+    "ci": {
+      "url": "https://github.com/cosmemilton/acbr-node/actions/runs/39036176529",
+      "headSha": "1f4ac0c5567d3a2204da7cd3c45109c8aa461db8",
+      "jobs": [
+        {
+          "name": "sdk (ubuntu-24.04, 22.12.0)",
+          "conclusion": "success"
+        },
+        {
+          "name": "sdk (windows-latest, 22.12.0)",
+          "conclusion": "success"
+        },
+        {
+          "name": "sdk (windows-latest, 24)",
+          "conclusion": "success"
+        },
+        {
+          "name": "sdk (ubuntu-24.04, 24)",
+          "conclusion": "success"
+        }
+      ]
+    },
+    "sdk": {
+      "win32": {
+        "node": "v24.18.0",
+        "typecheckExitCode": 0,
+        "buildExitCode": 0,
+        "testExitCode": 0,
+        "counts": {
+          "tests": 150,
+          "suites": 0,
+          "pass": 144,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 6,
+          "todo": 0
+        }
+      },
+      "linux": {
+        "node": "v24.15.0",
+        "typecheckExitCode": 0,
+        "buildExitCode": 0,
+        "testExitCode": 0,
+        "counts": {
+          "tests": 150,
+          "suites": 0,
+          "pass": 145,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 5,
+          "todo": 0
+        }
+      }
+    },
+    "installedCandidate": {
+      "win32": {
+        "status": "passed",
+        "node": "v24.18.0",
+        "stages": [
+          {
+            "name": "offline-package",
+            "exitCode": 0
+          },
+          {
+            "name": "installed-licenses",
+            "exitCode": 0
+          },
+          {
+            "name": "installed-api-esm",
+            "exitCode": 0
+          },
+          {
+            "name": "installed-api-cjs",
+            "exitCode": 0
+          },
+          {
+            "name": "installed-cli",
+            "exitCode": 0
+          }
+        ],
+        "operations": [
+          {
+            "kind": "esm",
+            "fixtures": 4,
+            "localOperations": 12,
+            "compilerPathAbsent": true,
+            "sourceCheckoutUnused": true
+          },
+          {
+            "kind": "cjs",
+            "fixtures": 4,
+            "localOperations": 12,
+            "compilerPathAbsent": true,
+            "sourceCheckoutUnused": true
+          }
+        ],
+        "licenses": {
+          "passed": true,
+          "version": "0.2.1",
+          "platform": "win32",
+          "candidateOnly": true,
+          "sdkCanonicalPolicyTexts": 11,
+          "canonicalPolicySha256": "72dd7f2fa4c7b84d5740b297a3a626a45aba3cb4d722cee7a2cc778d6c3e9394",
+          "canonicalApacheBytes": 11358,
+          "canonicalApacheSha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "runtimeCommonLicenseNames": [
+            "Apache-2.0",
+            "Artistic",
+            "GFDL-1.2",
+            "GPL",
+            "GPL-2",
+            "GPL-3",
+            "LGPL",
+            "LGPL-2",
+            "LGPL-2.1",
+            "LGPL-3"
+          ],
+          "commonInventoryAndReferenceClosureVerified": true,
+          "runtimeManifestExactInventory": true,
+          "runtimeManifestVerifiedFileCount": 253,
+          "installedPureHelperSha256": "98dcfd4b7d5f856a31356a2ae8e211ea5f57d90e884e8bbb6200b421f406a46b",
+          "networkAttempts": 0,
+          "subprocessAttempts": 0,
+          "fiscalApiImported": false,
+          "nativeWorkerExecuted": false,
+          "instrumentationScope": "Covered Node network and child_process APIs are blocked during the pure packaged license helper audit."
+        },
+        "cliAuditInvocations": 6,
+        "measuredCliSideEffects": 0,
+        "registryNetworkUsed": false,
+        "syntheticOnly": true,
+        "realCertificateRead": false,
+        "transmissionExecuted": false
+      },
+      "linux": {
+        "status": "passed",
+        "node": "v24.15.0",
+        "stages": [
+          {
+            "name": "offline-package",
+            "exitCode": 0
+          },
+          {
+            "name": "installed-licenses",
+            "exitCode": 0
+          },
+          {
+            "name": "installed-api-esm",
+            "exitCode": 0
+          },
+          {
+            "name": "installed-api-cjs",
+            "exitCode": 0
+          },
+          {
+            "name": "installed-cli",
+            "exitCode": 0
+          }
+        ],
+        "operations": [
+          {
+            "kind": "esm",
+            "fixtures": 4,
+            "localOperations": 12,
+            "compilerPathAbsent": true,
+            "sourceCheckoutUnused": true
+          },
+          {
+            "kind": "cjs",
+            "fixtures": 4,
+            "localOperations": 12,
+            "compilerPathAbsent": true,
+            "sourceCheckoutUnused": true
+          }
+        ],
+        "licenses": {
+          "passed": true,
+          "version": "0.2.1",
+          "platform": "linux",
+          "candidateOnly": true,
+          "sdkCanonicalPolicyTexts": 11,
+          "canonicalPolicySha256": "72dd7f2fa4c7b84d5740b297a3a626a45aba3cb4d722cee7a2cc778d6c3e9394",
+          "canonicalApacheBytes": 11358,
+          "canonicalApacheSha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "runtimeCommonLicenseNames": [
+            "Apache-2.0",
+            "Artistic",
+            "GFDL-1.2",
+            "GPL",
+            "GPL-1",
+            "GPL-2",
+            "GPL-3",
+            "LGPL",
+            "LGPL-2",
+            "LGPL-2.1",
+            "LGPL-3"
+          ],
+          "commonInventoryAndReferenceClosureVerified": true,
+          "runtimeManifestExactInventory": true,
+          "runtimeManifestVerifiedFileCount": 264,
+          "installedPureHelperSha256": "98dcfd4b7d5f856a31356a2ae8e211ea5f57d90e884e8bbb6200b421f406a46b",
+          "networkAttempts": 0,
+          "subprocessAttempts": 0,
+          "fiscalApiImported": false,
+          "nativeWorkerExecuted": false,
+          "instrumentationScope": "Covered Node network and child_process APIs are blocked during the pure packaged license helper audit."
+        },
+        "cliAuditInvocations": 6,
+        "measuredCliSideEffects": 0,
+        "registryNetworkUsed": false,
+        "syntheticOnly": true,
+        "realCertificateRead": false,
+        "transmissionExecuted": false
+      }
+    },
+    "runtimeComparisons": {
+      "linux": {
+        "baselineVersion": "0.2.0",
+        "baselineTarballSha256": "d2beccbcf31820ebfc49ce0e246b8fe500f5757df458a0985cd09745ea369c45",
+        "manifestSha256": "d7e0bb150982daa3670d1ee8d6a1e0e1e422b2e213bc03c6ea8828ffea659414",
+        "originalRuntimeFilesPreserved": true,
+        "originalFilesPreserved": 255,
+        "protectedCategories": {
+          "worker": {
+            "files": 1,
+            "bytesAndModesIdentical": true
+          },
+          "librariesAndProviders": {
+            "files": 13,
+            "bytesAndModesIdentical": true
+          },
+          "correspondingSources": {
+            "files": 12,
+            "bytesAndModesIdentical": true
+          },
+          "schemas": {
+            "files": 201,
+            "bytesAndModesIdentical": true
+          },
+          "originalNoticesAndLicenses": {
+            "files": 25,
+            "bytesAndModesIdentical": true
+          }
+        },
+        "manifestExactInventoryAndHashes": true,
+        "commonInventoryMatchesIndependentClosure": true
+      },
+      "win32": {
+        "baselineVersion": "0.2.0",
+        "baselineTarballSha256": "60b58b9745af5414af19d8087a86af7a00e7d012b51d8d6a3181003b41d3ce83",
+        "manifestSha256": "0db06cb335587a8bb862a647073fd4c0c0e5b47fe0004c9cdf960d88daf74c40",
+        "originalRuntimeFilesPreserved": true,
+        "originalFilesPreserved": 245,
+        "protectedCategories": {
+          "worker": {
+            "files": 1,
+            "bytesAndModesIdentical": true
+          },
+          "librariesAndProviders": {
+            "files": 4,
+            "bytesAndModesIdentical": true
+          },
+          "correspondingSources": {
+            "files": 13,
+            "bytesAndModesIdentical": true
+          },
+          "schemas": {
+            "files": 201,
+            "bytesAndModesIdentical": true
+          },
+          "originalNoticesAndLicenses": {
+            "files": 23,
+            "bytesAndModesIdentical": true
+          }
+        },
+        "manifestExactInventoryAndHashes": true,
+        "commonInventoryMatchesIndependentClosure": true
+      }
+    },
+    "sdkSourceReview": {
+      "status": "passed",
+      "publicApiEntrypointsAndModelContractUnchanged": [
+        "dist/index.js",
+        "dist/index.cjs",
+        "dist/runtime.js",
+        "dist/runtime.cjs",
+        "dist/contract.json"
+      ],
+      "allOtherCliSourceMapContentsIdentical": true,
+      "sdkV2ReadmeOnlyDeltaFromFirstAuditedCandidate": true
+    },
+    "canonicalLicenses": {
+      "textCount": 11,
+      "apacheBytes": 11358,
+      "apacheSha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "policySha256": "72dd7f2fa4c7b84d5740b297a3a626a45aba3cb4d722cee7a2cc778d6c3e9394",
+      "provenance": "docs/licenses/common/ORIGIN.json",
+      "regressionCoverage": "Omitted/truncated texts and inventory entries, rewritten manifest, recursive references and aliases, unsafe/unknown references, typographic quotes, preserved notices and packaged policy identity."
+    }
+  },
+  "limitations": [
+    "Synthetic local fixtures and locally generated test certificates only. Local XML generation, signature and schema validation were tested; no real certificate, fiscal consultation, transmission or fiscal service call was used.",
+    "No native recompilation was required: existing worker/library/schema/source/notice bytes and archive modes were independently compared with the published 0.2.0 packages.",
+    "An earlier local Linux suite with temporary fixtures on /mnt/c produced one assertion failure in a pre-existing queue test that assumes 20 ms is sufficient to reach execution. The final full suite uses a native Linux temporary directory; both Linux CI jobs also passed. No product source change was made for this environment recheck.",
+    "Registry byte verification and fresh registry installations are performed after publication and are recorded separately."
+  ],
+  "artifacts": [
+    {
+      "file": "cosmemilton-acbr-node-linux-x64-0.2.1.tgz",
+      "bytes": 51682585,
+      "sha256": "029e23b5fc05e0886a9e988300ef46811db0705f687109d114d34e87500d1b5f"
+    },
+    {
+      "file": "cosmemilton-acbr-node-win32-x64-0.2.1.tgz",
+      "bytes": 33777463,
+      "sha256": "3a4f3ab038c8e9a705ac5a74f8d9c237c96aea1922b54fb2c5f844a8af445cc3"
+    },
+    {
+      "file": "cosmemilton-acbr-node-0.2.1.tgz",
+      "bytes": 752437,
+      "sha256": "a77f97932d7412b21c83375c36178c233d62a085752d85e0b4d7c88cc1119dff"
+    }
+  ],
+  "publicationAuthorizedOn": "2026-10-17"
+}

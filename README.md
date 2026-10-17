@@ -14,17 +14,17 @@ npm install cosmemilton-acbr-node
 
 O npm instala o runtime opcional da sua plataforma. Não use `--omit=optional` na instalação final. Também é possível informar `runtimeDirectory` para um motor próprio.
 
-Esta documentação descreve a versão 0.2.0, que adiciona `recuperarXml` e mantém o help TAG introduzido na 0.1.2. A disponibilidade da 0.2.0 no npm só é anunciada após a confirmação dessa versão no registry.
+Esta documentação descreve a versão 0.2.1, preparada localmente para completar os textos de licenças distribuídos com os runtimes. O motor fiscal é o mesmo da 0.2.0, que adicionou `recuperarXml`, e o help TAG da 0.1.2 continua disponível. A disponibilidade da 0.2.1 no npm depende de publicação e confirmação posteriores no registry.
 
 Para instalar tarballs revisados em um projeto separado, informe o SDK e o runtime da plataforma:
 
 ```bash
 npm install --offline --ignore-scripts --no-audit --no-fund \
-  /caminho/cosmemilton-acbr-node-0.2.0.tgz \
-  /caminho/cosmemilton-acbr-node-linux-x64-0.2.0.tgz
+  /caminho/cosmemilton-acbr-node-0.2.1.tgz \
+  /caminho/cosmemilton-acbr-node-linux-x64-0.2.1.tgz
 ```
 
-No Windows, selecione `cosmemilton-acbr-node-win32-x64-0.2.0.tgz`.
+No Windows, selecione `cosmemilton-acbr-node-win32-x64-0.2.1.tgz`.
 
 ```ts
 import { writeFile } from 'node:fs/promises';

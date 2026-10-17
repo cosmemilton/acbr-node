@@ -88,6 +88,16 @@ Mantenha os outros campos existentes de `acbr.config.json`, como compilador, pro
 
 ## Validação
 
+### Textos integrais nos runtimes Linux e Windows
+
+Os avisos originais de dependências permanecem com seus bytes originais em `runtime/licenses`. Alguns avisos Debian/Ubuntu remetem a `/usr/share/common-licenses/NAME`; essa referência descreve a máquina de build, e o texto também precisa acompanhar o runtime distribuído.
+
+O build usa `scripts/runtime-license-inventory.mjs` antes de gerar o manifesto. O helper copia para `runtime/licenses/common` os textos canônicos fixados em `docs/licenses/common/ORIGIN.json`, resolve referências adicionais e aliases como `GPL` e `LGPL`, e inclui Apache-2.0 nos dois sistemas. `INVENTORY.json` registra os nomes, tamanhos, SHA-256, avisos que exigem cada texto e sua origem. Os textos e o inventário entram nos hashes de `runtime/manifest.json`.
+
+O build, sua conferência, o empacotamento e a auditoria de release recusam referências desconhecidas, textos ausentes ou truncados, links e material sem hash no manifesto. A comparação usa os textos aprovados do SDK, além dos hashes do próprio runtime. O validador do bundle também compara a política e os textos dentro do SDK extraído com o checkout revisado. Assim, recalcular o manifesto de um pacote incompleto não supre o texto ausente.
+
+Uma nova referência exige acrescentar seu texto integral e origem verificável à política revisada. O processo preserva os avisos específicos dos componentes e o licenciamento próprio de cada um. Alterações nesse material geram novos manifestos e tarballs em uma nova versão; os artefatos de versões publicadas permanecem preservados.
+
 A receita confere arquitetura PE x64, imports de todas as DLLs e exports essenciais de libxml2 para parsing, C14N e XML Schema. A compilação cruzada não executa a suíte upstream no Linux: os testes gerados são executáveis Windows. `SOURCE.json` registra explicitamente essa limitação.
 
 Depois do staging, execute os testes offline do worker no Windows: geração de XML, assinatura com certificado temporário, validação dos schemas e TLS contra servidor local. Essa etapa comprova o funcionamento das DLLs no alvo. Os testes locais não autorizam emissão ou transmissão fiscal.
