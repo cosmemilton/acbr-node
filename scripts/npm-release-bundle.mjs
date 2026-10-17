@@ -16,17 +16,50 @@ const repository = 'git+https://github.com/cosmemilton/acbr-node.git';
 const homepage = 'https://miltonjunior.dev.br/acbr-node/';
 
 export function assertApprovedManifest(manifest) {
-  if (manifest.formatVersion !== 1 || !versionPattern.test(manifest.version) ||
+  if (![1, 2].includes(manifest.formatVersion) || !versionPattern.test(manifest.version) ||
       manifest.baseUrl !== `${homepage}releases/${manifest.version}/` ||
       !Array.isArray(manifest.artifacts) || manifest.artifacts.length !== 3) throw Error('Manifesto de publicação inválido.');
+  if (manifest.formatVersion === 2 && manifest.releaseKind !== 'sdk-only') throw Error('Tipo de release SDK inválido.');
+  if (manifest.formatVersion === 2 && (!Number.isSafeInteger(manifest.generated?.sourceRevision) ||
+      !hashPattern.test(manifest.generated?.sourceHash ?? '') || !hashPattern.test(manifest.generated?.contractHash ?? ''))) throw Error('Contrato da release SDK inválido.');
   assertGeneratedHashes(manifest.generated?.fileHashes);
   for (const [index, name] of packageNames.entries()) {
     const entry = manifest.artifacts[index];
-    if (entry.name !== name || entry.file !== `${name.replace(/^@/, '').replace('/', '-')}-${manifest.version}.tgz` ||
+    const version = manifest.formatVersion === 1 ? manifest.version : entry.version;
+    if (!versionPattern.test(version ?? '') || entry.name !== name || entry.file !== `${name.replace(/^@/, '').replace('/', '-')}-${version}.tgz` ||
         !hashPattern.test(entry.sha256) || !Number.isSafeInteger(entry.bytes) || entry.bytes <= 0 || entry.bytes > 200 * 1024 * 1024) throw Error('Identidade/hash de tarball inválido.');
+    if (manifest.formatVersion === 2 && (index < 2
+      ? entry.reusedFrom !== version || version === manifest.version
+      : version !== manifest.version || entry.reusedFrom !== undefined)) throw Error('Versão/reutilização de pacote inválida.');
+    if (manifest.formatVersion === 1 && (entry.version !== undefined || entry.reusedFrom !== undefined)) throw Error('Manifesto v1 precisa de versões sincronizadas.');
   }
   if (!hashPattern.test(manifest.validationSha256) || !hashPattern.test(manifest.checksumsSha256)) throw Error('Hashes de validação ausentes.');
   return manifest;
+}
+
+// SDK patches may reuse only artifacts already approved in this checkout.
+// The old manifest remains immutable and pins both runtime bytes and contract.
+export async function assertReusedArtifacts(manifest, readReference = async version =>
+  JSON.parse(await readFile(path.join(root, 'release', version, 'manifest.json'), 'utf8'))) {
+  assertApprovedManifest(manifest);
+  for (const entry of manifest.artifacts.filter(item => item.reusedFrom)) {
+    const previous = assertApprovedManifest(await readReference(entry.reusedFrom));
+    const original = previous.artifacts.find(item => item.name === entry.name);
+    if (previous.version !== entry.reusedFrom || !original || original.reusedFrom ||
+        ['name', 'file', 'bytes', 'sha256'].some(key => original[key] !== entry[key]) ||
+        (original.version ?? previous.version) !== entry.version ||
+        ['sourceRevision', 'sourceHash', 'contractHash'].some(key => previous.generated[key] !== manifest.generated[key]) ||
+        GENERATED_FILES.some(name => previous.generated.fileHashes[name] !== manifest.generated.fileHashes[name])) {
+      throw Error('Runtime reutilizado diverge da release aprovada: ' + entry.name);
+    }
+  }
+}
+
+const artifactVersion = (entry, version) => entry.version ?? version;
+export function artifactDownloadUrl(manifest, name) {
+  const entry = manifest.artifacts.find(entry => entry.file === name);
+  if (!entry && !['SHA256SUMS', 'VALIDATION.json'].includes(name)) throw Error('Arquivo de release não aprovado.');
+  return (entry?.reusedFrom ? `${homepage}releases/${entry.reusedFrom}/` : manifest.baseUrl) + name;
 }
 
 export function assertRegistryMatches(dist, data, name) {
@@ -134,13 +167,14 @@ export async function readApprovedManifest() {
   const directory = path.join(root, 'release', pointer.version);
   const manifest = assertApprovedManifest(JSON.parse(await readFile(path.join(directory, 'manifest.json'), 'utf8')));
   if (pointer.version !== manifest.version) throw Error('Versão do ponteiro diverge.');
+  await assertReusedArtifacts(manifest);
   return { manifest, directory };
 }
 
 async function downloadBundle(directory, manifest) {
   await mkdir(directory, { recursive: true });
   for (const name of [...manifest.artifacts.map(entry => entry.file), 'SHA256SUMS', 'VALIDATION.json']) {
-    const response = await fetch(manifest.baseUrl + name, { redirect: 'error', signal: AbortSignal.timeout(120000) });
+    const response = await fetch(artifactDownloadUrl(manifest, name), { redirect: 'error', signal: AbortSignal.timeout(120000) });
     if (!response.ok) throw Error(`Download falhou: ${name}, HTTP ${response.status}`);
     const maximum = manifest.artifacts.find(entry => entry.file === name)?.bytes ?? 1024 * 1024;
     let bytes = 0;
@@ -168,6 +202,7 @@ async function inventory(directory, prefix = '') {
 
 export async function validateBundle(directory, approved = undefined) {
   const { manifest, directory: approvedDirectory } = approved ?? await readApprovedManifest();
+  await assertReusedArtifacts(manifest);
   const validationFile = path.join(directory, 'VALIDATION.json');
   const checksumsFile = path.join(directory, 'SHA256SUMS');
   if (await sha256(validationFile) !== manifest.validationSha256 || await sha256(checksumsFile) !== manifest.checksumsSha256 ||
@@ -202,7 +237,7 @@ export async function validateBundle(directory, approved = undefined) {
       const packageDirectory = path.join(target, 'package');
       const pkg = JSON.parse(await readFile(path.join(packageDirectory, 'package.json'), 'utf8'));
       const workspacePackage = JSON.parse(await readFile(path.join(root, entry.name === packageNames[2] ? 'package.json' : `packages/${entry.name.replace(/^cosmemilton-/, '')}/package.json`), 'utf8'));
-      if (pkg.name !== entry.name || pkg.version !== manifest.version || pkg.license !== 'LGPL-2.1-or-later' ||
+      if (pkg.name !== entry.name || pkg.version !== artifactVersion(entry, manifest.version) || pkg.license !== 'LGPL-2.1-or-later' ||
           pkg.publishConfig?.access !== 'public' || pkg.repository?.url !== repository || pkg.homepage !== homepage ||
           JSON.stringify(pkg) !== JSON.stringify(workspacePackage) || pkg.scripts?.prepublishOnly || pkg.scripts?.publish || pkg.scripts?.postpublish) throw Error(`Metadados npm incompatíveis: ${entry.name}`);
       extracted.push(packageDirectory);
@@ -211,7 +246,7 @@ export async function validateBundle(directory, approved = undefined) {
     const mainDirectory = extracted[2];
     await auditLicensePolicy(path.join(mainDirectory, 'docs/licenses/common'));
     const mainPackage = JSON.parse(await readFile(path.join(mainDirectory, 'package.json'), 'utf8'));
-    if (packageNames.slice(0, 2).some(name => mainPackage.optionalDependencies?.[name] !== manifest.version)) throw Error('SDK e runtimes têm versões diferentes.');
+    if (manifest.artifacts.slice(0, 2).some(entry => mainPackage.optionalDependencies?.[entry.name] !== artifactVersion(entry, manifest.version))) throw Error('Dependências do SDK divergem das versões de runtime aprovadas.');
     auditMainInventory((await inventory(mainDirectory)).map(name => ({ path: name })));
     if (await sha256(path.join(mainDirectory, 'acbr.lock.json')) !== await sha256(path.join(root, 'acbr.lock.json')) ||
         await sha256(path.join(mainDirectory, 'native/generated/AcbrModels.pas')) !== manifest.generated.fileHashes['native/generated/AcbrModels.pas']) throw Error('Fontes do SDK divergem da revisão.');
@@ -219,7 +254,7 @@ export async function validateBundle(directory, approved = undefined) {
       if (/\.(pas|lpr|inc|lpi)$/i.test(name) && await sha256(path.join(mainDirectory, 'native', name)) !== await sha256(path.join(root, 'native', name))) throw Error('Fonte nativa do SDK diverge do checkout: ' + name);
     }
     for (const [index, platform] of ['linux', 'win32'].entries()) {
-      await auditRuntime(mainDirectory, extracted[index], platform, manifest.version, manifest.generated, lock);
+      await auditRuntime(mainDirectory, extracted[index], platform, artifactVersion(manifest.artifacts[index], manifest.version), manifest.generated, lock);
     }
     console.log(`Auditados os três tarballs ${manifest.version}; hashes, metadados, contratos, fontes e inventários conferidos.`);
     return prepared;
@@ -281,14 +316,15 @@ export async function publishBundle(entries, version, {
   pause = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds)),
   onProgress = async () => {},
 } = {}) {
-  const outcomes = entries.map(entry => ({ name: entry.name, version, status: 'not-attempted', registryChecks: 0, stageChecks: 0 }));
+  const outcomes = entries.map(entry => ({ name: entry.name, version: artifactVersion(entry, version),
+    ...(entry.reusedFrom ? { reusedFrom: entry.reusedFrom } : {}), status: 'not-attempted', registryChecks: 0, stageChecks: 0 }));
   let phase = 'authentication', currentIndex = -1, diagnostic;
   const checkpoint = () => onProgress({ version, status: 'in-progress', phase, packages: outcomes });
   const checkPublic = async index => {
     const outcome = outcomes[index];
     outcome.registryChecks++;
     outcome.lastRegistryCheckAt = new Date().toISOString();
-    const dist = await lookup(entries[index], version);
+    const dist = await lookup(entries[index], artifactVersion(entries[index], version));
     if (dist) assertRegistryMatches(dist, entries[index].data, entries[index].name);
     outcome.publicVersion = dist ? 'verified' : 'absent';
     if (dist) outcome.status = 'published';
@@ -296,7 +332,7 @@ export async function publishBundle(entries, version, {
   };
   const checkStage = async index => {
     outcomes[index].stageChecks++;
-    const stage = await stageLookup(entries[index], version);
+    const stage = await stageLookup(entries[index], artifactVersion(entries[index], version));
     outcomes[index].staging = stage ? 'verified' : 'absent';
     return stage;
   };
@@ -310,6 +346,7 @@ export async function publishBundle(entries, version, {
     for (const [index] of entries.entries()) {
       currentIndex = index;
       existing.push(Boolean(await checkPublic(index)));
+      if (entries[index].reusedFrom && !existing[index]) throw Error('Runtime reutilizado precisa estar publicado: ' + entries[index].name);
     }
     for (const [index] of entries.entries()) {
       currentIndex = index;
@@ -318,27 +355,28 @@ export async function publishBundle(entries, version, {
     await checkpoint();
     for (const [index, entry] of entries.entries()) {
       currentIndex = index;
+      const entryVersion = artifactVersion(entry, version);
       diagnostic = undefined;
       if (existing[index]) {
         outcomes[index].status = 'published';
-        console.log(`Já publicado com bytes idênticos: ${entry.name}@${version}`);
+        console.log(`Já publicado com bytes idênticos: ${entry.name}@${entryVersion}`);
         continue;
       }
       if (pending[index]) {
         Object.assign(outcomes[index], pending[index], { status: 'awaiting-2fa' });
-        console.log(`::notice::Staging conferido, aguardando 2FA: ${entry.name}@${version}, ${pending[index].stageId}`);
+        console.log(`::notice::Staging conferido, aguardando 2FA: ${entry.name}@${entryVersion}, ${pending[index].stageId}`);
         continue;
       }
       const deferSdk = entry.name === packageNames[2] && outcomes.some(item => item.status === 'awaiting-2fa');
       phase = 'publication';
       outcomes[index].status = 'publication-unconfirmed';
       await checkpoint();
-      console.log(`${deferSdk ? 'Enviando SDK para staging' : 'Publicando'}: ${entry.name}@${version}`);
+      console.log(`${deferSdk ? 'Enviando SDK para staging' : 'Publicando'}: ${entry.name}@${entryVersion}`);
       const publishArgs = ['publish', entry.tarball, '--access', 'public', '--ignore-scripts', '--dry-run=false', '--json', '--registry', registry, '--loglevel', 'notice'];
       let result = await npm('npm', deferSdk ? ['stage', ...publishArgs] : publishArgs, { allowFailure: true });
       if (!deferSdk && classifyNpmError(result) === 'stage-required')
         result = await npm('npm', ['stage', ...publishArgs], { allowFailure: true });
-      diagnostic = safeNpmDiagnostic(result, entry, version);
+      diagnostic = safeNpmDiagnostic(result, entry, entryVersion);
       outcomes[index].npmDiagnostic = diagnostic;
       // JSON is local tarball metadata, never a publication receipt. Notices may
       // contain authentication links; only the closed diagnostic schema is logged.
@@ -360,7 +398,7 @@ export async function publishBundle(entries, version, {
       if (staged) {
         Object.assign(outcomes[index], staged, { status: 'awaiting-2fa' });
         await checkpoint();
-        console.log(`::notice::Staging conferido, aguardando 2FA: ${entry.name}@${version}, ${staged.stageId}`);
+        console.log(`::notice::Staging conferido, aguardando 2FA: ${entry.name}@${entryVersion}, ${staged.stageId}`);
         continue;
       }
       if (!dist) throw Error(`Publicação não confirmada: ${entry.name} (${safeNpmError(result)}) Consulte o resultado antes de qualquer nova tentativa.`);
@@ -398,19 +436,20 @@ export async function inspectBundle(entries, version, {
   if (typeof dryRunConfigured !== 'boolean') throw Error('Configuração dry-run inválida no diagnóstico.');
   const packages = [];
   for (const entry of entries) {
-    const dist = await lookup(entry, version);
+    const entryVersion = artifactVersion(entry, version);
+    const dist = await lookup(entry, entryVersion);
     if (dist) assertRegistryMatches(dist, entry.data, entry.name);
-    const view = await npm('npm', ['view', `${entry.name}@${version}`, '--json', '--registry', registry, '--loglevel', 'error', '--prefer-online'], { allowFailure: true });
+    const view = await npm('npm', ['view', `${entry.name}@${entryVersion}`, '--json', '--registry', registry, '--loglevel', 'error', '--prefer-online'], { allowFailure: true });
     let authenticatedVersion = 'unconfirmed';
     if (view.code === 0) {
       const metadata = parseNpmJson(view.stdout);
-      if (metadata?.name !== entry.name || metadata.version !== version) throw Error('Metadados autenticados npm incompatíveis.');
+      if (metadata?.name !== entry.name || metadata.version !== entryVersion) throw Error('Metadados autenticados npm incompatíveis.');
       assertRegistryMatches(metadata.dist, entry.data, entry.name);
       authenticatedVersion = 'verified';
     } else if (npmErrorCode(view) === 'E404') authenticatedVersion = 'absent';
-    const stage = await stageLookup(entry, version);
-    packages.push({ name: entry.name, version, publicVersion: dist ? 'verified' : 'absent', authenticatedVersion,
-      staging: stage ? 'verified' : 'absent', ...(stage ? { stageId: stage.stageId } : {}), npmDiagnostic: safeNpmDiagnostic(view, entry, version) });
+    const stage = await stageLookup(entry, entryVersion);
+    packages.push({ name: entry.name, version: entryVersion, ...(entry.reusedFrom ? { reusedFrom: entry.reusedFrom } : {}), publicVersion: dist ? 'verified' : 'absent', authenticatedVersion,
+      staging: stage ? 'verified' : 'absent', ...(stage ? { stageId: stage.stageId } : {}), npmDiagnostic: safeNpmDiagnostic(view, entry, entryVersion) });
   }
   return { version, status: 'diagnostic-only', npmVersion, dryRunConfigured, packages };
 }
@@ -432,8 +471,11 @@ function projectDiagnostic(value) {
 export async function writePublicationResult(directory, result, summaryPath = process.env.GITHUB_STEP_SUMMARY) {
   if (!versionPattern.test(result?.version ?? '') || !['published', 'awaiting-2fa', 'failed', 'in-progress', 'diagnostic-only'].includes(result.status) || !Array.isArray(result.packages)) throw Error('Resultado de publicação inválido.');
   const safe = { version: result.version, status: result.status, packages: result.packages.map(entry => {
-    if (!packageNames.includes(entry.name) || entry.version !== result.version) throw Error('Identidade do resultado de publicação inválida.');
+    if (!packageNames.includes(entry.name) || !versionPattern.test(entry.version ?? '') ||
+        (entry.version !== result.version && (!packageNames.slice(0, 2).includes(entry.name) || entry.reusedFrom !== entry.version)) ||
+        (entry.reusedFrom !== undefined && (!packageNames.slice(0, 2).includes(entry.name) || entry.reusedFrom !== entry.version || entry.version === result.version))) throw Error('Identidade do resultado de publicação inválida.');
     const item = { name: entry.name, version: entry.version };
+    if (entry.reusedFrom) item.reusedFrom = entry.reusedFrom;
     if (['published', 'awaiting-2fa', 'publication-unconfirmed', 'not-attempted', 'blocked'].includes(entry.status)) item.status = entry.status;
     for (const key of ['publicVersion', 'authenticatedVersion', 'staging']) if (['absent', 'verified', 'unconfirmed'].includes(entry[key])) item[key] = entry[key];
     for (const key of ['registryChecks', 'stageChecks']) if (Number.isInteger(entry[key]) && entry[key] >= 0 && entry[key] <= 10000) item[key] = entry[key];
@@ -461,13 +503,14 @@ export async function writePublicationResult(directory, result, summaryPath = pr
 export async function dryRunBundle(entries, version, { npm = run, lookup = registryDist } = {}) {
   const existing = [];
   for (const entry of entries) {
-    const dist = await lookup(entry, version);
+    const dist = await lookup(entry, artifactVersion(entry, version));
     if (dist) assertRegistryMatches(dist, entry.data, entry.name);
     existing.push(Boolean(dist));
+    if (entry.reusedFrom && !dist) throw Error('Runtime reutilizado precisa estar publicado: ' + entry.name);
   }
   for (const [index, entry] of entries.entries()) {
     if (existing[index]) {
-      console.log(`Dry run dispensado para versão pública com bytes idênticos: ${entry.name}@${version}`);
+      console.log(`Dry run dispensado para versão pública com bytes idênticos: ${entry.name}@${artifactVersion(entry, version)}`);
       continue;
     }
     await npm('npm', ['publish', entry.tarball, '--dry-run', '--access', 'public', '--ignore-scripts', '--registry', registry, '--loglevel', 'error']);

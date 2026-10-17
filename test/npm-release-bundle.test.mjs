@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdtemp, rm, access, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, access, writeFile, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { assertApprovedManifest, assertRegistryMatches, dryRunBundle, publishBundle, stagedArtifact, safeNpmError } from '../scripts/npm-release-bundle.mjs';
+import { assertApprovedManifest, assertReusedArtifacts, artifactDownloadUrl, assertRegistryMatches, dryRunBundle, publishBundle, stagedArtifact, safeNpmError, inspectBundle, writePublicationResult } from '../scripts/npm-release-bundle.mjs';
 
 const version = '0.1.0';
 const stageId = '1de6f3db-2ed9-4d72-b3dd-8f0e2b474a2f';
@@ -62,6 +62,157 @@ function manifest() {
     artifacts: names.map(name => ({ name, file: `${name.replace(/^@/, '').replace('/', '-')}-0.1.0.tgz`, bytes: 100, sha256: 'd'.repeat(64) })),
   };
 }
+
+function sdkManifest() {
+  const original = manifest();
+  Object.assign(original.generated, { sourceRevision: 48590, sourceHash: 'e'.repeat(64), contractHash: 'f'.repeat(64) });
+  return { original, release: { ...structuredClone(original), formatVersion: 2, releaseKind: 'sdk-only',
+    version: '0.1.1', baseUrl: 'https://miltonjunior.dev.br/acbr-node/releases/0.1.1/',
+    artifacts: original.artifacts.map((entry, index) => ({ ...entry,
+      version: index < 2 ? original.version : '0.1.1',
+      ...(index < 2 ? { reusedFrom: original.version } : { file: 'cosmemilton-acbr-node-0.1.1.tgz' }),
+    })),
+  } };
+}
+
+function sdkEntries() {
+  return releaseEntries().map((entry, index) => ({ ...entry, version: index < 2 ? version : '0.1.1',
+    ...(index < 2 ? { reusedFrom: version } : {}),
+  }));
+}
+
+test('SDK-only manifest pins both unchanged runtimes to an existing approved release', async () => {
+  const { original, release } = sdkManifest();
+  assertApprovedManifest(release);
+  await assertReusedArtifacts(release, async requested => { assert.equal(requested, version); return original; });
+  for (const change of [
+    value => { value.releaseKind = 'full'; },
+    value => { delete value.artifacts[0].version; },
+    value => { delete value.artifacts[0].reusedFrom; },
+    value => { value.artifacts[1].version = value.version; },
+    value => { value.artifacts[2].version = version; },
+    value => { value.artifacts[2].reusedFrom = value.version; },
+    value => { delete value.generated.sourceHash; },
+  ]) {
+    const altered = structuredClone(release); change(altered);
+    assert.throws(() => assertApprovedManifest(altered));
+  }
+  for (const change of [
+    value => { value.artifacts[0].sha256 = '0'.repeat(64); },
+    value => { value.artifacts[1].bytes++; },
+    value => { value.generated.contractHash = '0'.repeat(64); },
+    value => { value.generated.sourceHash = '0'.repeat(64); },
+    value => { value.generated.fileHashes['native/generated/AcbrModels.pas'] = '0'.repeat(64); },
+  ]) {
+    const altered = structuredClone(release); change(altered);
+    await assert.rejects(assertReusedArtifacts(altered, async () => original), /diverge/);
+  }
+  await assert.rejects(assertReusedArtifacts(release, async () => ({ ...original, version: '0.0.1', baseUrl: 'https://miltonjunior.dev.br/acbr-node/releases/0.0.1/' })), /diverge|inválido/);
+});
+
+test('historical v1 approval files remain valid and cannot opt into mixed versions implicitly', async () => {
+  for (const releasedVersion of ['0.2.0', '0.2.1']) {
+    await assertReusedArtifacts(JSON.parse(await readFile(new URL(`../release/${releasedVersion}/manifest.json`, import.meta.url), 'utf8')));
+  }
+  for (const key of ['version', 'reusedFrom']) {
+    const altered = manifest(); altered.artifacts[0][key] = '0.0.1';
+    assert.throws(() => assertApprovedManifest(altered), /sincronizadas/);
+  }
+});
+
+test('SDK-only downloads keep runtime URLs on their original version and new reports on the SDK release', () => {
+  const { original, release } = sdkManifest();
+  for (const entry of release.artifacts) {
+    assert.equal(artifactDownloadUrl(release, entry.file),
+      (entry.reusedFrom ? original.baseUrl : release.baseUrl) + entry.file);
+  }
+  for (const filename of ['SHA256SUMS', 'VALIDATION.json']) assert.equal(artifactDownloadUrl(release, filename), release.baseUrl + filename);
+  assert.throws(() => artifactDownloadUrl(release, '../private-file'), /não aprovado/);
+  for (const entry of original.artifacts) assert.equal(artifactDownloadUrl(original, entry.file), original.baseUrl + entry.file);
+});
+
+test('SDK-only publication verifies runtime versions without staging or republishing them', async () => {
+  const entries = sdkEntries(), calls = [], lookups = [], stages = [];
+  let sdkPublished = false;
+  const result = await publishBundle(entries, '0.1.1', {
+    hasToken: true,
+    lookup: async (entry, requestedVersion) => {
+      lookups.push([entry.name, requestedVersion]); assert.equal(requestedVersion, entry.version);
+      return entry.reusedFrom || sdkPublished ? { shasum: digest(entry.data) } : null;
+    },
+    stageLookup: async (entry, requestedVersion) => { stages.push([entry.name, requestedVersion]); return null; },
+    npm: async (command, args) => {
+      calls.push(args);
+      if (args[0] === 'publish') {
+        const sdk = entries[2]; assert.equal(args[1], sdk.tarball); sdkPublished = true;
+        return { code: 0, stdout: JSON.stringify({ [sdk.name]: { name: sdk.name, version: sdk.version,
+          size: sdk.data.length, shasum: digest(sdk.data), integrity: 'sha512-' + createHash('sha512').update(sdk.data).digest('base64') } }) };
+      }
+      return { code: 0 };
+    },
+  });
+  assert.equal(result.version, '0.1.1'); assert.equal(result.status, 'published');
+  assert.deepEqual(result.packages.map(entry => entry.version), [version, version, '0.1.1']);
+  assert.deepEqual(result.packages.slice(0, 2).map(entry => entry.reusedFrom), [version, version]);
+  assert.equal(result.packages[2].npmDiagnostic.tarballMetadataMatches, true);
+  assert.deepEqual(calls.map(args => args[0]), ['whoami', 'publish']);
+  assert.deepEqual(stages, [[entries[2].name, '0.1.1']]);
+  assert.equal(lookups.length, 4);
+});
+
+test('SDK-only dry run and publication refuse missing or changed reused runtimes before any submission', async () => {
+  for (const conflicting of [false, true]) {
+    const entries = sdkEntries(), calls = [];
+    const options = { hasToken: true, stageLookup: noStages,
+      lookup: async entry => entry === entries[0] ? conflicting ? { shasum: '0'.repeat(40) } : null : { shasum: digest(entry.data) },
+      npm: async (command, args) => { calls.push(args); return { code: 0 }; },
+    };
+    await assert.rejects(dryRunBundle(entries, '0.1.1', options), /precisa estar publicado|diverge/);
+    assert.deepEqual(calls, []);
+    await assert.rejects(publishBundle(entries, '0.1.1', options));
+    assert.deepEqual(calls.map(args => args[0]), ['whoami']);
+  }
+});
+
+test('SDK-only dry run skips both old runtime versions and tests only the new SDK', async () => {
+  const entries = sdkEntries(), calls = [];
+  await dryRunBundle(entries, '0.1.1', {
+    lookup: async (entry, requestedVersion) => {
+      assert.equal(requestedVersion, entry.version);
+      return entry.reusedFrom ? { shasum: digest(entry.data) } : null;
+    },
+    npm: async (command, args) => { calls.push(args); return { code: 0 }; },
+  });
+  assert.equal(calls.length, 1); assert.equal(calls[0][1], entries[2].tarball);
+});
+
+test('SDK-only inspection and sanitized receipt preserve each approved package version', async t => {
+  const entries = sdkEntries(), calls = [], stages = [];
+  const result = await inspectBundle(entries, '0.1.1', {
+    hasToken: true,
+    lookup: async (entry, requestedVersion) => { assert.equal(requestedVersion, entry.version); return { shasum: digest(entry.data) }; },
+    stageLookup: async (entry, requestedVersion) => { stages.push(requestedVersion); return null; },
+    npm: async (command, args) => {
+      calls.push(args);
+      if (args[0] === '--version') return { code: 0, stdout: '11.16.0' };
+      if (args[0] === 'config') return { code: 0, stdout: 'false' };
+      if (args[0] === 'view') {
+        const entry = entries.find(item => args[1] === `${item.name}@${item.version}`);
+        assert.ok(entry);
+        return { code: 0, stdout: JSON.stringify({ name: entry.name, version: entry.version, dist: { shasum: digest(entry.data) } }) };
+      }
+      return { code: 0 };
+    },
+  });
+  assert.deepEqual(stages, [version, version, '0.1.1']);
+  const directory = await mkdtemp(path.join(tmpdir(), 'acbr-sdk-release-result-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const receipt = await writePublicationResult(directory, result, null);
+  assert.deepEqual(receipt.packages.map(entry => entry.version), [version, version, '0.1.1']);
+  assert.equal(receipt.packages[0].reusedFrom, version);
+  const invalid = structuredClone(result); invalid.packages[2].version = version;
+  await assert.rejects(writePublicationResult(directory, invalid, null), /Identidade/);
+});
 
 test('release manifest confines download origin, version, package identities and order', () => {
   assertApprovedManifest(manifest());
