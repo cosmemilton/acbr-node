@@ -1,6 +1,7 @@
 import { cp, mkdir, readFile, writeFile, rm, lstat } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
+import { auditRuntimeLicenses } from './runtime-license-inventory.mjs';
 const root=process.cwd();
 const pkg=JSON.parse(await readFile('package.json','utf8'));
 const generated=JSON.parse(await readFile('.acbr/generated/manifest.json','utf8'));
@@ -13,6 +14,7 @@ for(const platform of ['linux','win32']){
   if(!name||path.isAbsolute(name)||relative==='..'||relative.startsWith('..'+path.sep)||(await lstat(file)).isSymbolicLink())throw Error('Arquivo inválido no runtime.');
   if(createHash('sha256').update(await readFile(file)).digest('hex')!==hash)throw Error('Hash divergente: '+name);
  }
+ await auditRuntimeLicenses(runtime,manifest);
  const directory=path.resolve('packages/acbr-node-'+platform+'-x64');
  if(!directory.startsWith(path.join(root,'packages')+path.sep))throw Error('Destino fora do projeto.');
  await mkdir(directory,{recursive:true});
