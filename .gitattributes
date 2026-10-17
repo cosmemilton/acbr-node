@@ -3,3 +3,6 @@ native/** text eol=lf
 generated/acbr/** text eol=lf
 /acbr.lock.json text eol=lf
 release/** text eol=lf
+
+# Canonical license text and hash provenance must retain exact upstream bytes.
+docs/licenses/common/** -text

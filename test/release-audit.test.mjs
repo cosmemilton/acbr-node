@@ -1,12 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { auditGenerated, auditRuntime, auditMainInventory, sha256 } from '../scripts/audit-release.mjs';
+import { completeRuntimeLicenses } from '../scripts/runtime-license-inventory.mjs';
 async function fixture(t, platform = 'linux') {
  const root = await mkdtemp(path.join(tmpdir(), 'acbr-release-audit-'));
  t.after(() => rm(root, { recursive: true, force: true }));
+ await cp(new URL('../docs/licenses/common/',import.meta.url),path.join(root,'docs/licenses/common'),{recursive:true});
  async function put(name, content = name) { await mkdir(path.dirname(path.join(root, name)), { recursive: true }); await writeFile(path.join(root, name), content); }
  const lock = { source: { revision: 48590, treeHash: 'b'.repeat(64) } };
  const generated = { sourceRevision: 48590, sourceHash: lock.source.treeHash, contractHash: 'c'.repeat(64), fileHashes: {} };
@@ -19,14 +21,17 @@ async function fixture(t, platform = 'linux') {
  const files = {};
  const required = ['acbr-worker','licenses/ACBr-LICENSE.TXT','licenses/FPC-COPYING.GPL.txt','licenses/FPC-COPYING.LGPL.txt','licenses/FPC-COPYING.FPC','licenses/Lazarus-COPYING.txt','licenses/Lazarus-COPYING.LGPL.txt','licenses/Lazarus-COPYING.modifiedLGPL.txt','licenses/toolchain-notices.json','sources/acbr-source.tar.gz','sources/native-dependencies.json','ACBrNFeServicos.ini','openssl.cnf','schemas/nfe.xsd'];
  if(platform==='win32')required.push('licenses/GCC-Runtime.LICENSE','licenses/GCC-GPL-3.LICENSE','licenses/MinGW-w64.LICENSE','licenses/libcrypto-3-x64.dll.LICENSE','licenses/libssl-3-x64.dll.LICENSE','licenses/libxml2.dll.LICENSE','licenses/legacy.dll.LICENSE','ossl-modules/legacy.dll','lib/libxml2.dll');
- else required.push('ossl-modules/legacy.so');
+ else required.push('ossl-modules/legacy.so','licenses/libssl.so.3.txt');
  for(const name of required)await put(relative+'/runtime/'+name);
+ await put(relative+'/runtime/sources/native-dependencies.json',JSON.stringify(platform==='linux'?{'libssl.so.3':{copyright:'licenses/libssl.so.3.txt'}}:{}));
  await put(relative+'/runtime/sources/build.json',JSON.stringify(build));required.push('sources/build.json');
  if(platform==='win32'){
   await put(relative+'/runtime/sources/win32-x64-SOURCE.json',JSON.stringify({platform:'win32',arch:'x64',vcRedistributable:false,validation:{peImportAudit:true},artifacts:[{name:'libxml2.dll',sha256:await sha256(path.join(runtime,'lib/libxml2.dll'))}]}));
   required.push('sources/win32-x64-SOURCE.json');
  }
  for(const name of ['acbr-worker.lpr','generated/AcbrModels.pas']){await put(relative+'/runtime/sources/native/'+name,await readFile(path.join(root,'native',name)));required.push('sources/native/'+name);}
+ const licenses=await completeRuntimeLicenses(runtime,{policyDirectory:path.join(root,'docs/licenses/common')});
+ required.push('licenses/common/INVENTORY.json',...Object.values(licenses.files).map(entry=>entry.file));
  for(const name of required)files[name]=await sha256(path.join(runtime,name));
  const manifest={formatVersion:1,sourceRevision:48590,contractHash:generated.contractHash,platform,arch:'x64',executable:'acbr-worker',generatedFileHashes:generated.fileHashes,files};
  async function saveManifest(){await writeFile(path.join(runtime,'manifest.json'),JSON.stringify(manifest));}
@@ -59,6 +64,22 @@ test('release refuses untracked runtime files and missing license notices',async
 });
 test('release refuses native source drift with matching model contract',async t=>{
  const f=await fixture(t);await writeFile(path.join(f.root,'native/acbr-worker.lpr'),'new engine');await assert.rejects(f.audit(),/Fonte do motor diverge/);
+});
+
+test('release refuses an omitted Apache text even when disk and manifest agree on both platforms',async t=>{
+ for(const platform of ['linux','win32']){
+  const f=await fixture(t,platform);
+  const name='licenses/common/Apache-2.0.txt';
+  delete f.manifest.files[name];await rm(path.join(f.runtime,name));await f.saveManifest();
+  await assert.rejects(f.audit(),/common-licenses incompleto|ENOENT/);
+ }
+});
+
+test('release binds original Linux dependency notices to declared provenance',async t=>{
+ const f=await fixture(t);
+ const name='licenses/libssl.so.3.txt';
+ delete f.manifest.files[name];await rm(path.join(f.runtime,name));await f.saveManifest();
+ await assert.rejects(f.audit(),/ENOENT|material de licença ausente/);
 });
 test('main npm inventory excludes credentials and machine config',()=>{
  const paths=['native/acbr-worker.lpr','tools/extract-model.lpr','dist/cli.js','dist/index.js','dist/index.cjs','LICENSE','NOTICE'];

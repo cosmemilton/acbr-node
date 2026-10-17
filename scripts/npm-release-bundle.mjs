@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { auditRuntime, auditMainInventory, GENERATED_FILES, assertGeneratedHashes, sha256 } from './audit-release.mjs';
+import { auditLicensePolicy } from './runtime-license-inventory.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const registry = 'https://registry.npmjs.org';
@@ -208,6 +209,7 @@ export async function validateBundle(directory, approved = undefined) {
       prepared.push({ ...entry, data, tarball: path.join(directory, entry.file) });
     }
     const mainDirectory = extracted[2];
+    await auditLicensePolicy(path.join(mainDirectory, 'docs/licenses/common'));
     const mainPackage = JSON.parse(await readFile(path.join(mainDirectory, 'package.json'), 'utf8'));
     if (packageNames.slice(0, 2).some(name => mainPackage.optionalDependencies?.[name] !== manifest.version)) throw Error('SDK e runtimes têm versões diferentes.');
     auditMainInventory((await inventory(mainDirectory)).map(name => ({ path: name })));

@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { lstat, readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
+import { auditRuntimeLicenses } from './runtime-license-inventory.mjs';
 export const GENERATED_FILES = ['generated/acbr/models.ts', 'generated/acbr/index.ts', 'native/generated/AcbrModels.pas'];
 const HASH = /^[a-f0-9]{64}$/;
 export async function sha256(file) { return createHash('sha256').update(await readFile(file)).digest('hex'); }
@@ -49,6 +50,7 @@ export async function auditRuntime(root, directory, platform, version, generated
   if (platform === 'win32') required.push('licenses/GCC-Runtime.LICENSE', 'licenses/GCC-GPL-3.LICENSE', 'licenses/MinGW-w64.LICENSE', 'licenses/libcrypto-3-x64.dll.LICENSE', 'licenses/libssl-3-x64.dll.LICENSE', 'licenses/libxml2.dll.LICENSE', 'licenses/legacy.dll.LICENSE', 'sources/win32-x64-SOURCE.json', 'ossl-modules/legacy.dll');
   else required.push('ossl-modules/legacy.so');
   for (const name of required) if (!Object.hasOwn(manifest.files, name)) throw Error('Material correspondente/notice ausente: ' + name);
+  await auditRuntimeLicenses(runtime, manifest, { policyDirectory: path.join(root, 'docs/licenses/common') });
   for (const name of await inventory(path.join(root, 'native'))) {
     if (!/\.(pas|lpr|inc|lpi)$/i.test(name)) continue;
     const staged = 'sources/native/' + name;
