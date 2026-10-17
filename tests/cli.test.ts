@@ -14,6 +14,31 @@ test('CLI shows help and rejects unexpected options/revisions', async () => {
   assert.throws(() => parseArguments(['source', 'update', '--revision', '12x']), /número SVN/);
   assert.throws(() => parseArguments(['init', '--config']), /obrigatório/);
 });
+
+test('global and command help are available without installed metadata or configuration', async () => {
+  const dependencies = { contractRoot: join(tmpdir(), 'acbr-help-does-not-read-this-directory') };
+  const global = capture(); assert.equal(await main(['help'], global.io, dependencies), 0);
+  assert.match(global.result().stdout, /describe \[TARGET\]/); assert.match(global.result().stdout, /--version/);
+  for (const [command, expected] of [
+    [['describe'], 'acbr-node describe [TARGET]'],
+    [['describe', 'TTipoNFe'], 'acbr-node describe [TARGET]'],
+    [['help', 'TAG'], 'acbr-node help TAG caminho'],
+    [['init'], 'acbr-node init'],
+    [['source'], 'acbr-node source update'],
+    [['source', 'update'], 'acbr-node source update'],
+    [['source', 'lock'], 'acbr-node source lock'],
+    [['generate'], 'acbr-node generate'],
+    [['build'], 'acbr-node build'],
+    [['check'], 'acbr-node check'],
+    [['doctor'], 'acbr-node doctor'],
+  ] as const) {
+    const report = capture();
+    assert.equal(await main([...command, '--help'], report.io, dependencies), 0);
+    assert.ok(report.result().stdout.startsWith(`Uso: ${expected}`)); assert.equal(report.result().stderr, '');
+  }
+  const short = capture(); assert.equal(await main(['describe', '-h'], short.io, dependencies), 0);
+  assert.match(short.result().stdout, /contrato instalado/);
+});
 test('CLI init writes JSON output and refuses a second init', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'acbr-cli-'));
   try {

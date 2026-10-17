@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import { describeField, describeInstalledField, validateContractMetadata, FieldHelpError, type ContractMetadata } from '../src/contract-help.js';
+import { describeField, describeInstalledField, describeTarget, describeInstalledTarget, formatTargetDescription, installedSdkVersion, validateContractMetadata, FieldHelpError, type ContractMetadata } from '../src/contract-help.js';
 import { renderContractMetadata } from '../src/generator.js';
 import { main } from '../src/cli.js';
 
@@ -122,4 +122,88 @@ test('CLI emits text or JSON and structured failures without reading caller conf
     const report = capture(); assert.equal(await main([...args], report.io, { contractRoot: root }), 1);
     assert.equal(report.result().stdout, ''); assert.equal(JSON.parse(report.result().stderr).error.code, expected);
   }
+});
+
+test('describe resolves named types without borrowing a default from a field', () => {
+  const field = describeTarget(metadata, '9.9.9', 'Ide.tpNF');
+  assert.deepEqual(field, describeField(metadata, '9.9.9', 'Ide.tpNF'));
+  const type = describeTarget(metadata, '9.9.9', 'TTipoNFe');
+  assert.ok('name' in type);
+  assert.equal(type.name, 'TTipoNFe'); assert.equal(type.kind, 'enum');
+  assert.deepEqual(type.values, field.values);
+  for (const key of ['path', 'readonly', 'declaredDefault']) assert.equal(Object.hasOwn(type, key), false);
+  assert.match(formatTargetDescription(type), /Tipo: TTipoNFe/);
+  assert.doesNotMatch(formatTargetDescription(type), /Padrão declarado/);
+  const changed = structuredClone(metadata);
+  changed.ir.types.find(node => node.name === 'TTipoNFe')!.values!.push('tnNovoSintetico');
+  rebind(changed);
+  assert.deepEqual(describeTarget(changed, '9.9.9', 'TTipoNFe').values, ['tnEntrada', 'tnSaida', 'tnNovoSintetico']);
+});
+
+test('describe defaults to the IR root and resolves object and collection types', () => {
+  const root = describeTarget(metadata, '9.9.9');
+  assert.ok('name' in root); assert.equal(root.name, metadata.ir.root);
+  assert.ok(root.members!.some(member => member.name === 'Ide'));
+  const collection = metadata.ir.types.find(node => node.kind === 'list')!;
+  const description = describeTarget(metadata, '9.9.9', collection.name);
+  assert.ok('name' in description); assert.equal(description.kind, 'list');
+  assert.equal(description.itemType, collection.item); assert.equal(description.inputType, 'array');
+  assert.match(formatTargetDescription(description), new RegExp(`Tipo do elemento: ${collection.item}`));
+  assert.throws(() => describeTarget(metadata, '9.9.9', 'NoSuchType'), code('CAMPO_INEXISTENTE'));
+  const corrupt = structuredClone(metadata); corrupt.ir.root = 'Missing';
+  assert.throws(() => describeTarget(corrupt, '9.9.9'), code('CONTRATO_INVALIDO'));
+});
+
+test('installed describe preserves field output and validates contract metadata for named types', async t => {
+  const root = await installedFixture(t);
+  assert.deepEqual(await describeInstalledTarget('Ide.tpNF', root), await describeInstalledField('Ide.tpNF', root));
+  const type = await describeInstalledTarget('TTipoNFe', root);
+  assert.equal(type.sdkVersion, '9.9.9-synthetic'); assert.equal(type.contractHash, metadata.contractHash);
+  await writeFile(path.join(root, 'acbr.lock.json'), JSON.stringify({ source: { revision: 1, treeHash: metadata.sourceHash } }));
+  await assert.rejects(describeInstalledTarget('TTipoNFe', root), code('CONTRATO_INCOMPATIVEL'));
+});
+
+test('describe CLI supports fields, types, default root and structured usage errors', async t => {
+  const root = await installedFixture(t);
+  for (const target of ['Ide.tpNF', 'TTipoNFe', undefined]) {
+    const report = capture();
+    const args = target ? ['describe', target, '--json'] : ['describe', '--json'];
+    assert.equal(await main(args, report.io, { contractRoot: root }), 0);
+    assert.equal(report.result().stderr, '');
+    assert.deepEqual(JSON.parse(report.result().stdout), await describeInstalledTarget(target, root));
+  }
+  const field = capture(), legacy = capture(), type = capture();
+  assert.equal(await main(['describe', 'Ide.tpNF'], field.io, { contractRoot: root }), 0);
+  assert.equal(await main(['help', 'TAG', 'Ide.tpNF'], legacy.io, { contractRoot: root }), 0);
+  assert.deepEqual(field.result(), legacy.result());
+  assert.equal(await main(['describe', 'TTipoNFe'], type.io, { contractRoot: root }), 0);
+  assert.match(type.result().stdout, /Valores permitidos na API: tnEntrada, tnSaida/);
+  assert.doesNotMatch(type.result().stdout, /Padrão declarado/);
+  for (const [args, expected] of [
+    [['describe', 'CST', '--json'], 'CAMPO_AMBIGUO'],
+    [['describe', 'Ide.dhEmi', '--json'], 'CAMPO_INEXISTENTE'],
+    [['describe', 'Ide.tpNF', '--config', 'never-read.json', '--json'], 'USO_INVALIDO'],
+    [['describe', 'TTipoNFe', '--revision', '48590', '--json'], 'USO_INVALIDO'],
+    [['describe', 'TTipoNFe', 'extra', '--json'], 'USO_INVALIDO'],
+    [['describe', '--unknown-option', '--json'], 'USO_INVALIDO'],
+    [['describe', '--json', '--json'], 'USO_INVALIDO'],
+  ] as const) {
+    const report = capture(); assert.equal(await main([...args], report.io, { contractRoot: root }), 1);
+    assert.equal(report.result().stdout, ''); assert.equal(JSON.parse(report.result().stderr).error.code, expected);
+  }
+});
+
+test('version reads only the installed package and does not require contract or lock files', async t => {
+  const root = await installedFixture(t);
+  await rm(path.join(root, 'dist'), { recursive: true });
+  await rm(path.join(root, 'acbr.lock.json'));
+  assert.equal(await installedSdkVersion(root), '9.9.9-synthetic');
+  for (const flag of ['--version', '-V']) {
+    const report = capture(); assert.equal(await main([flag], report.io, { contractRoot: root }), 0);
+    assert.equal(report.result().stdout, 'acbr-node 9.9.9-synthetic\n'); assert.equal(report.result().stderr, '');
+  }
+  const json = capture(); assert.equal(await main(['--version', '--json'], json.io, { contractRoot: root }), 0);
+  assert.deepEqual(JSON.parse(json.result().stdout), { version: '9.9.9-synthetic' });
+  await writeFile(path.join(root, 'package.json'), JSON.stringify({ version: 'invalid' }));
+  await assert.rejects(installedSdkVersion(root), code('VERSAO_INDISPONIVEL'));
 });

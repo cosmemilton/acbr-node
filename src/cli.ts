@@ -3,11 +3,14 @@ import { realpathSync } from 'node:fs';
 import { access } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describeInstalledField, formatFieldDescription, FieldHelpError } from './contract-help.js';
+import { describeInstalledField, describeInstalledTarget, formatFieldDescription, formatTargetDescription, installedSdkVersion, FieldHelpError } from './contract-help.js';
 
 export const HELP = `acbr-node — compilação e contrato Node/ACBr NF-e
 
 Uso:
+  acbr-node describe [TARGET] [--json]
+  acbr-node describe Ide.tpNF [--json]
+  acbr-node describe TTipoNFe [--json]
   acbr-node help TAG Ide.tpNF [--json]
   acbr-node help TAG 'Det[].Imposto.PIS.CST' [--json]
   acbr-node init [--config caminho] [--revision HEAD|número]
@@ -17,12 +20,72 @@ Uso:
   acbr-node build [--config caminho]
   acbr-node check [--config caminho]
   acbr-node doctor [--config caminho]
+  acbr-node --version
+  acbr-node COMANDO --help
 
 source update consulta o SVN oficial e substitui apenas fontes verificadas pelo lock.
 source lock registra um export existente cuja origem/revisão o operador já conferiu.
 generate/build/check nunca atualizam fontes. Nenhum comando transmite NF-e.
-help TAG consulta somente o contrato da versão instalada, offline e sem runtime ou certificado.
+describe consulta um campo ou tipo do contrato instalado; sem TARGET, descreve TNFe.
+help TAG preserva a consulta de campos existente. A ajuda é offline, sem runtime ou certificado.
 `;
+const COMMAND_HELP: Record<string, string> = {
+  describe: `Uso: acbr-node describe [TARGET] [--json]
+
+Descreve um campo (Ide.tpNF, Det[].Imposto.PIS.CST) ou tipo (TTipoNFe).
+Sem TARGET, descreve o tipo raiz TNFe. Os valores vêm do contrato instalado.
+O padrão declarado pertence ao campo; a descrição de um tipo não tem esse padrão.
+--json emite metadados estruturados; erros JSON vão para stderr, com código de saída 1.
+Consulta offline, sem ler configuração, iniciar runtime ou acessar a rede.
+`,
+  'help tag': `Uso: acbr-node help TAG caminho [--json]
+
+Consulta de campos preservada para compatibilidade, incluindo o formato JSON.
+Exemplos: Ide.tpNF e Det[].Imposto.PIS.CST. Para tipos, use describe TTipoNFe.
+Consulta offline do contrato instalado, sem runtime ou certificado.
+`,
+  init: `Uso: acbr-node init [--config caminho] [--revision HEAD|número] [--json]
+
+Cria a configuração e os arquivos de apoio sem sobrescrever arquivos divergentes.
+Próximo passo: acbr-node source update.
+`,
+  source: `Uso: acbr-node source update [--config caminho] [--revision HEAD|número] [--json]
+     acbr-node source lock --revision número [--config caminho] [--json]
+
+update consulta o SVN oficial; lock registra um export existente já conferido.
+Use acbr-node source update --help ou acbr-node source lock --help.
+`,
+  'source update': `Uso: acbr-node source update [--config caminho] [--revision HEAD|número] [--json]
+
+Consulta o SVN oficial e substitui apenas fontes verificadas pelo lock.
+Execute generate para atualizar o contrato após conferir a nova revisão.
+`,
+  'source lock': `Uso: acbr-node source lock --revision número [--config caminho] [--json]
+
+Registra um export existente cuja origem e revisão o operador já conferiu.
+Exige um número SVN positivo; não consulta nem atualiza as fontes.
+`,
+  generate: `Uso: acbr-node generate [--config caminho] [--json]
+
+Confere as fontes fixadas pelo lock e gera o contrato e os modelos.
+Não atualiza fontes nem transmite NF-e.
+`,
+  build: `Uso: acbr-node build [--config caminho] [--json]
+
+Compila o runtime nativo com as fontes e o contrato já conferidos.
+Não atualiza fontes nem transmite NF-e.
+`,
+  check: `Uso: acbr-node check [--config caminho] [--json]
+
+Confere hashes de fontes, contrato e runtime e executa verificações locais do motor.
+Não atualiza fontes nem transmite NF-e.
+`,
+  doctor: `Uso: acbr-node doctor [--config caminho] [--json]
+
+Diagnostica as ferramentas e, se houver configuração, as dependências do projeto.
+Não transmite NF-e.
+`,
+};
 export interface CliIO { stdout: { write(text: string): unknown }; stderr: { write(text: string): unknown }; }
 function revision(value: string | undefined): 'HEAD' | number | undefined {
   if (value === undefined) return undefined;
@@ -30,9 +93,9 @@ function revision(value: string | undefined): 'HEAD' | number | undefined {
   if (!/^[1-9]\d*$/.test(value) || !Number.isSafeInteger(Number(value))) throw new Error('--revision deve ser HEAD ou um número SVN positivo.');
   return Number(value);
 }
-interface Args { command: string[]; config: string; revision?: 'HEAD' | number; json: boolean; help: boolean; }
+interface Args { command: string[]; config: string; revision?: 'HEAD' | number; json: boolean; help: boolean; version: boolean; }
 export function parseArguments(args: string[]): Args {
-  const result: Args = { command: [], config: 'acbr.config.json', json: false, help: false };
+  const result: Args = { command: [], config: 'acbr.config.json', json: false, help: false, version: false };
   const used = new Set<string>();
   for (let i = 0; i < args.length; i++) {
     const arg = args[i]!;
@@ -40,6 +103,7 @@ export function parseArguments(args: string[]): Args {
     if (used.has(arg)) throw new Error(`Opção repetida: ${arg}.`);
     used.add(arg);
     if (arg === '--help' || arg === '-h') result.help = true;
+    else if (arg === '--version' || arg === '-V') result.version = true;
     else if (arg === '--json') result.json = true;
     else if (arg === '--config' || arg === '--revision') {
       const value = args[++i];
@@ -51,22 +115,41 @@ export function parseArguments(args: string[]): Args {
   return result;
 }
 export async function main(args = process.argv.slice(2), io: CliIO = process, dependencies: { contractRoot?: string } = {}): Promise<number> {
-  const initialCommand = args.filter(arg => !['--json', '--help', '-h'].includes(arg));
-  let jsonTag = args.includes('--json') && initialCommand[0]?.toLowerCase() === 'help' && initialCommand[1]?.toLowerCase() === 'tag';
+  const initialCommand = args.filter(arg => !['--json', '--help', '-h', '--version', '-V'].includes(arg));
+  const describeCommand = initialCommand[0]?.toLowerCase() === 'describe';
+  let jsonTag = args.includes('--json') && (describeCommand || initialCommand[0]?.toLowerCase() === 'help' && initialCommand[1]?.toLowerCase() === 'tag');
   try {
     let options: Args;
     try { options = parseArguments(args); } catch (error) {
-      if (jsonTag) throw new FieldHelpError('USO_INVALIDO', 'Argumentos inválidos. Use acbr-node help TAG caminho [--json].');
+      if (jsonTag) throw new FieldHelpError('USO_INVALIDO', describeCommand ? 'Argumentos inválidos. Use acbr-node describe [TARGET] [--json].' : 'Argumentos inválidos. Use acbr-node help TAG caminho [--json].');
       throw error;
     }
     const command = options.command.join(' ');
-    if (options.help || !command) { io.stdout.write(HELP); return 0; }
+    if (options.help) {
+      const first = options.command[0]?.toLowerCase();
+      const key = first === 'help' && options.command[1]?.toLowerCase() === 'tag' ? 'help tag' : first === 'describe' ? 'describe' : command.toLowerCase();
+      io.stdout.write(COMMAND_HELP[key] ?? HELP); return 0;
+    }
     const output = (value: unknown, text: string) => io.stdout.write(options.json ? `${JSON.stringify(value, null, 2)}\n` : `${text}\n`);
+    const packageRoot = dependencies.contractRoot ?? fileURLToPath(new URL('../', import.meta.url));
+    if (options.version) {
+      if (command || options.revision !== undefined || args.includes('--config')) throw new FieldHelpError('USO_INVALIDO', 'Use acbr-node --version sem comando, --config ou --revision.');
+      const version = await installedSdkVersion(packageRoot);
+      output({ version }, `acbr-node ${version}`); return 0;
+    }
+    if (!command || command.toLowerCase() === 'help') { io.stdout.write(HELP); return 0; }
+    if (options.command[0]?.toLowerCase() === 'describe') {
+      jsonTag = options.json;
+      if (options.command.length > 2) throw new FieldHelpError('USO_INVALIDO', 'Use acbr-node describe [TARGET] [--json].');
+      if (options.revision !== undefined || args.includes('--config')) throw new FieldHelpError('USO_INVALIDO', 'describe usa o contrato instalado e não aceita --config ou --revision.');
+      const description = await describeInstalledTarget(options.command[1], packageRoot);
+      output(description, formatTargetDescription(description)); return 0;
+    }
     if (options.command[0]?.toLowerCase() === 'help' && options.command[1]?.toLowerCase() === 'tag') {
       jsonTag = options.json;
       if (options.command.length !== 3) throw new FieldHelpError('USO_INVALIDO', 'Use acbr-node help TAG caminho [--json].');
       if (options.revision !== undefined || args.includes('--config')) throw new FieldHelpError('USO_INVALIDO', 'help TAG usa o contrato instalado e não aceita --config ou --revision.');
-      const description = await describeInstalledField(options.command[2]!, dependencies.contractRoot ?? fileURLToPath(new URL('../', import.meta.url)));
+      const description = await describeInstalledField(options.command[2]!, packageRoot);
       output(description, formatFieldDescription(description)); return 0;
     }
     if (command === 'init') {

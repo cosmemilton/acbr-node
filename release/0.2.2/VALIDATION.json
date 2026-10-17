@@ -1,0 +1,185 @@
+{
+  "formatVersion": 1,
+  "version": "0.2.2",
+  "validationStatus": "passed",
+  "publication": "authorized",
+  "publicationState": "not-published",
+  "preparedAt": "2026-10-17T15:17:49.572Z",
+  "sourceCommit": "26562b356822979c5db2260b2a3a1254f80c5a4b",
+  "sourceRevision": 48590,
+  "sourceHash": "6b768e4f45b4092d040f7576d6fb799d8b66b45ae29a0902c37334fb7c5c6816",
+  "contractHash": "e5a497cefe8e0e350a30da5cc04e88b35c38a98535893d52f878890260d1346d",
+  "scope": "Additive offline Node CLI help and SDK-only release support. Native runtime artifacts remain the published 0.2.1 bytes; fiscal API, generated contract and native sources are unchanged.",
+  "checks": {
+    "ci": {
+      "url": "https://github.com/cosmemilton/acbr-node/actions/runs/39044259936",
+      "headSha": "26562b356822979c5db2260b2a3a1254f80c5a4b",
+      "jobs": [
+        {
+          "name": "sdk (ubuntu-24.04, 22.12.0)",
+          "conclusion": "success"
+        },
+        {
+          "name": "sdk (ubuntu-24.04, 24)",
+          "conclusion": "success"
+        },
+        {
+          "name": "sdk (windows-latest, 22.12.0)",
+          "conclusion": "success"
+        },
+        {
+          "name": "sdk (windows-latest, 24)",
+          "conclusion": "success"
+        }
+      ]
+    },
+    "sdk": {
+      "win32": {
+        "node": "v24.18.0",
+        "typecheckExit": 0,
+        "buildExit": 0,
+        "testExit": 0,
+        "counts": {
+          "tests": 163,
+          "pass": 157,
+          "fail": 0,
+          "skipped": 6
+        }
+      },
+      "linux": {
+        "node": "v24.15.0",
+        "typecheckExit": 0,
+        "buildExit": 0,
+        "testExit": 0,
+        "counts": {
+          "tests": 163,
+          "suites": 0,
+          "pass": 158,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 5,
+          "todo": 0
+        }
+      }
+    },
+    "installedCandidate": {
+      "win32": {
+        "node": "v24.18.0",
+        "checks": 45,
+        "passed": 45,
+        "auditReceipts": 45,
+        "legacyChecks": 6,
+        "optionalRuntimesInstalled": false,
+        "subprocessesFromHelp": 0,
+        "networkFromHelp": 0,
+        "configOrCertificateReadsFromHelp": 0,
+        "filesystemMutationsFromHelp": 0,
+        "generatedContractValuesVerified": true
+      },
+      "linux": {
+        "node": "v24.15.0",
+        "checks": 45,
+        "passed": 45,
+        "auditReceipts": 45,
+        "legacyChecks": 6,
+        "optionalRuntimesInstalled": false,
+        "subprocessesFromHelp": 0,
+        "networkFromHelp": 0,
+        "configOrCertificateReadsFromHelp": 0,
+        "filesystemMutationsFromHelp": 0,
+        "generatedContractValuesVerified": true
+      }
+    },
+    "sourceReview": "Independent review found no release blockers.",
+    "linuxEvidenceReconciliation": "Original full-suite receipt retained. The source copy stayed identical. Only the separately verified installed-help test harness changed after the snapshot; all production files and full-suite inputs remain identical.",
+    "candidateComparison": {
+      "protectedFilesByteIdentical": 37,
+      "changed": [
+        "README.md",
+        "dist/cli.js",
+        "dist/cli.js.map",
+        "dist/types/src/cli.d.ts",
+        "dist/types/src/contract-help.d.ts",
+        "docs/API.md",
+        "docs/CLI.md",
+        "package.json",
+        "scripts/runtime-license-inventory.d.mts",
+        "scripts/runtime-license-inventory.mjs"
+      ],
+      "added": [
+        "docs/ajuda.md"
+      ],
+      "removed": [],
+      "lineEndingOnlyChanges": [
+        "scripts/runtime-license-inventory.d.mts",
+        "scripts/runtime-license-inventory.mjs"
+      ],
+      "sdkArchiveModes": "Regular SDK files are 0644 in the Windows npm pack instead of 0755 in the older Linux archive; installed Unix bin execution is checked separately."
+    },
+    "retainedHarnessAttempts": "The first isolated installed-help audit blocked Node loader bootstrap reads. The harness was corrected to allow and count only its exact entrypoint; initial receipts are retained. No CLI source changed for this correction.",
+    "installedNativeLinuxBin": {
+      "platform": "linux",
+      "node": "v24.15.0",
+      "sdkVersion": "0.2.2",
+      "filesystem": "native Linux /tmp",
+      "archiveCliMode": "644",
+      "installedCliMode": "755",
+      "cliSha256": "e3af0e2f854089d7874f34eeaed17a09c41ad62c1b01bfc6eda36c060720b9be",
+      "directUnixBinCommands": [
+        "--version",
+        "describe Ide.tpNF --json"
+      ],
+      "exitCodes": [
+        0,
+        0
+      ],
+      "checks": 2,
+      "passed": 2,
+      "auditReceipts": 2,
+      "npmLockIntegrityVerified": true,
+      "optionalRuntimePackagesInstalled": false,
+      "guardedCliCounters": {
+        "subprocessAttempts": 0,
+        "networkAttempts": 0,
+        "unapprovedReadAttempts": 0,
+        "filesystemMutationAttempts": 0
+      },
+      "finished": "2026-10-17T15:17:20.476Z"
+    }
+  },
+  "runtimePackagesReusedWithoutRepack": true,
+  "nativeRebuilt": false,
+  "fiscalOperationExecuted": false,
+  "realCertificateUsed": false,
+  "globalConfigurationChanged": false,
+  "consumers": {
+    "python": "unchanged",
+    "php": "unchanged",
+    "runtimePin": "0.2.1"
+  },
+  "artifacts": [
+    {
+      "name": "cosmemilton-acbr-node-linux-x64",
+      "file": "cosmemilton-acbr-node-linux-x64-0.2.1.tgz",
+      "bytes": 51682585,
+      "sha256": "029e23b5fc05e0886a9e988300ef46811db0705f687109d114d34e87500d1b5f",
+      "version": "0.2.1",
+      "reusedFrom": "0.2.1"
+    },
+    {
+      "name": "cosmemilton-acbr-node-win32-x64",
+      "file": "cosmemilton-acbr-node-win32-x64-0.2.1.tgz",
+      "bytes": 33777463,
+      "sha256": "3a4f3ab038c8e9a705ac5a74f8d9c237c96aea1922b54fb2c5f844a8af445cc3",
+      "version": "0.2.1",
+      "reusedFrom": "0.2.1"
+    },
+    {
+      "name": "cosmemilton-acbr-node",
+      "version": "0.2.2",
+      "file": "cosmemilton-acbr-node-0.2.2.tgz",
+      "bytes": 758854,
+      "sha256": "0b27364c0953e6338911e18f389e1aaf80d0f3483cfeabb40932fc359b181884"
+    }
+  ]
+}
