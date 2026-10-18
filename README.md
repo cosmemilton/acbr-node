@@ -151,6 +151,14 @@ Docker e CI remota de reconstrução dos motores não foram executados. A automa
 
 DANFE, impressão, A3, outros documentos e cálculos comerciais ficam para etapas posteriores. O preenchimento tributário continua sendo responsabilidade da aplicação. A homologação fiscal real é separada dos testes de implementação; os testes deste projeto usam dados sintéticos e serviços locais e não transmitem à SEFAZ.
 
+## Apoie o projeto
+
+Seu apoio ajuda a manter este projeto. Esta biblioteca facilita a integração
+com o ACBr em Node.js. Se o projeto ajuda você ou sua empresa, considere apoiar
+sua manutenção pelo [GitHub Sponsors](https://github.com/sponsors/cosmemilton).
+As contribuições ajudam a custear a infraestrutura, manter a documentação
+e dedicar tempo a correções, testes e melhorias. Qualquer valor é bem-vindo.
+
 ## Licença e fontes
 
 LGPL-2.1-or-later. Veja [LICENSE](LICENSE), [NOTICE](NOTICE) e as licenças incluídas nos runtimes. Fontes de referência: [ACBr público](https://projetoacbr.com.br/fontes/), [SVN oficial](https://svn.code.sf.net/p/acbr/code/trunk2/) e [FCL-passrc](https://www.freepascal.org/daily/packages/fcl-passrc/index.html).
