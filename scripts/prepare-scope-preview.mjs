@@ -62,4 +62,3 @@ const packed=JSON.parse(execFileSync('npm',['pack','--json','--ignore-scripts','
 artifacts.push({name:packed.name,version:packed.version,file:packed.filename,sha256:await sha256(path.join(target,packed.filename))});
 await writeFile(path.join(target,'preview.json'),JSON.stringify({publication:'not-authorized-by-this-preview',version:pkg.version,generated,artifacts},null,2)+'\n');
 console.log(target);
-

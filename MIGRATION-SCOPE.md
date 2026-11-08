@@ -48,4 +48,3 @@ approval/destination that preserves historic artifacts, and refresh registry loc
 Scoped tarballs cannot reuse old unscoped publication approval: reuse checks still require
 exact package identities and bytes. The existing v1/v2 approval workflow must not be used
 to claim renamed runtime tarballs are byte-identical approved legacy artifacts.
-
