@@ -14,7 +14,7 @@ const diagnosticFields = new Set(['exitCode', 'errorCode', 'errorCategory', 'out
 const noticeHints = new Set(['dry-run-mentioned', 'approval-mentioned', 'two-factor-mentioned', 'staging-mentioned']);
 
 function entries() {
-  return ['cosmemilton-acbr-node-linux-x64', 'cosmemilton-acbr-node-win32-x64', 'cosmemilton-acbr-node'].map(name => ({
+  return ['@cosmemilton/acbr-node-linux-x64', '@cosmemilton/acbr-node-win32-x64', '@cosmemilton/acbr-node'].map(name => ({
     name, data: Buffer.from('APPROVED_SYNTHETIC_BYTES_' + name), tarball: name + '-SYNTHETIC_ONLY.tgz',
   }));
 }

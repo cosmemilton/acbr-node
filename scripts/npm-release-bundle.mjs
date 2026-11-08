@@ -9,7 +9,7 @@ import { auditLicensePolicy } from './runtime-license-inventory.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const registry = 'https://registry.npmjs.org';
-const packageNames = ['cosmemilton-acbr-node-linux-x64', 'cosmemilton-acbr-node-win32-x64', 'cosmemilton-acbr-node'];
+const packageNames = ['@cosmemilton/acbr-node-linux-x64', '@cosmemilton/acbr-node-win32-x64', '@cosmemilton/acbr-node'];
 const versionPattern = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 const hashPattern = /^[a-f0-9]{64}$/;
 const repository = 'git+https://github.com/cosmemilton/acbr-node.git';
@@ -23,7 +23,12 @@ export function assertApprovedManifest(manifest) {
   if (manifest.formatVersion === 2 && (!Number.isSafeInteger(manifest.generated?.sourceRevision) ||
       !hashPattern.test(manifest.generated?.sourceHash ?? '') || !hashPattern.test(manifest.generated?.contractHash ?? ''))) throw Error('Contrato da release SDK inválido.');
   assertGeneratedHashes(manifest.generated?.fileHashes);
-  for (const [index, name] of packageNames.entries()) {
+  // Historical approvals remain readable; a manifest must use one complete namespace.
+  // Reuse still requires exact package identities and bytes, so scoped artifacts cannot
+  // inherit approval from unscoped tarballs.
+  const manifestNames = manifest.artifacts[2]?.name === 'cosmemilton-acbr-node'
+    ? packageNames.map(name => name.replace('@cosmemilton/', 'cosmemilton-')) : packageNames;
+  for (const [index, name] of manifestNames.entries()) {
     const entry = manifest.artifacts[index];
     const version = manifest.formatVersion === 1 ? manifest.version : entry.version;
     if (!versionPattern.test(version ?? '') || entry.name !== name || entry.file !== `${name.replace(/^@/, '').replace('/', '-')}-${version}.tgz` ||
@@ -108,7 +113,7 @@ export function safeNpmError(result) {
   const hints = {
     'stage-required': 'O npm exige staging e aprovação do mantenedor com 2FA.',
     'scope-not-found': 'Confira se o nome do pacote pertence à conta npm autenticada.',
-    'access-denied': 'Confira se o NPM_TOKEN permite criar e publicar os três pacotes cosmemilton-acbr-node.',
+    'access-denied': 'Confira se o NPM_TOKEN permite criar e publicar os três pacotes @cosmemilton/acbr-node.',
     'two-factor-required': 'Confira a política de 2FA e a permissão de publicação automatizada do NPM_TOKEN.',
     'check-scope-and-token': 'Confira a conta autenticada, os nomes npm e as permissões de criação/publicação do NPM_TOKEN.',
   };
@@ -236,7 +241,7 @@ export async function validateBundle(directory, approved = undefined) {
       await run('python3', [path.join(root, 'scripts/unpack-npm-tarball.py'), path.join(directory, entry.file), target]);
       const packageDirectory = path.join(target, 'package');
       const pkg = JSON.parse(await readFile(path.join(packageDirectory, 'package.json'), 'utf8'));
-      const workspacePackage = JSON.parse(await readFile(path.join(root, entry.name === packageNames[2] ? 'package.json' : `packages/${entry.name.replace(/^cosmemilton-/, '')}/package.json`), 'utf8'));
+      const workspacePackage = JSON.parse(await readFile(path.join(root, entry.name === packageNames[2] ? 'package.json' : `packages/${entry.name.replace(/^@cosmemilton\//, '')}/package.json`), 'utf8'));
       if (pkg.name !== entry.name || pkg.version !== artifactVersion(entry, manifest.version) || pkg.license !== 'LGPL-2.1-or-later' ||
           pkg.publishConfig?.access !== 'public' || pkg.repository?.url !== repository || pkg.homepage !== homepage ||
           JSON.stringify(pkg) !== JSON.stringify(workspacePackage) || pkg.scripts?.prepublishOnly || pkg.scripts?.publish || pkg.scripts?.postpublish) throw Error(`Metadados npm incompatíveis: ${entry.name}`);

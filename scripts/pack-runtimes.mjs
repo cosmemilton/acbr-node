@@ -20,7 +20,7 @@ for(const platform of ['linux','win32']){
  await mkdir(directory,{recursive:true});
  await rm(path.join(directory,'runtime'),{recursive:true,force:true});
  await cp(runtime,path.join(directory,'runtime'),{recursive:true});
- const json={name:'cosmemilton-acbr-node-'+platform+'-x64',version:pkg.version,license:pkg.license,description:'Motor ACBr '+platform+' x64 para '+pkg.name,os:[platform],cpu:['x64'],...(platform==='linux'?{libc:['glibc']}:{}),engines:pkg.engines,files:['runtime','LICENSE','NOTICE','README.md'],exports:{'./package.json':'./package.json'},publishConfig:{access:'public'},repository:{...pkg.repository,directory:'packages/acbr-node-'+platform+'-x64'},homepage:pkg.homepage,bugs:pkg.bugs};
+ const json={name:'@cosmemilton/acbr-node-'+platform+'-x64',version:pkg.optionalDependencies['@cosmemilton/acbr-node-'+platform+'-x64'],license:pkg.license,description:'Motor ACBr '+platform+' x64 para '+pkg.name,os:[platform],cpu:['x64'],...(platform==='linux'?{libc:['glibc']}:{}),engines:pkg.engines,files:['runtime','LICENSE','NOTICE','README.md'],exports:{'./package.json':'./package.json'},publishConfig:{access:'public'},repository:{...pkg.repository,directory:'packages/acbr-node-'+platform+'-x64'},homepage:pkg.homepage,bugs:pkg.bugs};
  await writeFile(path.join(directory,'package.json'),JSON.stringify(json,null,2)+'\n');
  for(const name of ['LICENSE','NOTICE'])await cp(name,path.join(directory,name));
  const readme=path.join(directory,'README.md');

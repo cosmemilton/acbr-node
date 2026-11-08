@@ -276,7 +276,7 @@ end;
 export function renderClientIndex():string{
  return [
   '// Generated client bound to its own ACBr contract. Do not edit.',
-  'import { criarEmissor as criarRuntime, diagnosticarErro as diagnosticarErroRuntime, diagnosticarResultado, type OpcoesEmissor, type OpcoesOperacao } from '+JSON.stringify('cosmemilton-acbr-node/runtime')+';',
+  'import { criarEmissor as criarRuntime, diagnosticarErro as diagnosticarErroRuntime, diagnosticarResultado, type OpcoesEmissor, type OpcoesOperacao } from '+JSON.stringify('@cosmemilton/acbr-node/runtime')+';',
   'import { ACBR_CONTRACT, validateTNFe, ErroValidacaoModelo, type TNFeInput } from '+JSON.stringify('./models.js')+';',
   'export * from '+JSON.stringify('./models.js')+';',
   'export { diagnosticarResultado };',

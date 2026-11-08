@@ -1,5 +1,5 @@
 // Generated client bound to its own ACBr contract. Do not edit.
-import { criarEmissor as criarRuntime, diagnosticarErro as diagnosticarErroRuntime, diagnosticarResultado, type OpcoesEmissor, type OpcoesOperacao } from "cosmemilton-acbr-node/runtime";
+import { criarEmissor as criarRuntime, diagnosticarErro as diagnosticarErroRuntime, diagnosticarResultado, type OpcoesEmissor, type OpcoesOperacao } from "@cosmemilton/acbr-node/runtime";
 import { ACBR_CONTRACT, validateTNFe, ErroValidacaoModelo, type TNFeInput } from "./models.js";
 export * from "./models.js";
 export { diagnosticarResultado };

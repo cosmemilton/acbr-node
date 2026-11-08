@@ -77,7 +77,7 @@ Use esse resumo nas interfaces e nos logs. Ele não copia XML, identidade fiscal
 caminhos, senha, `xMotivo`, stderr, stack ou causa bruta.
 
 ```ts
-import { TNFe, diagnosticarErro, diagnosticarResultado } from 'cosmemilton-acbr-node';
+import { TNFe, diagnosticarErro, diagnosticarResultado } from '@cosmemilton/acbr-node';
 
 try {
   const resultado = await emissor.gerarXml(new TNFe(dados));

@@ -35,7 +35,7 @@ export async function auditRuntime(root, directory, platform, version, generated
   if ((major > 0 || minor >= 2) && (!Array.isArray(manifest.capabilities) || !manifest.capabilities.includes('recuperarXml'))) {
     throw Error('Runtime sem capacidade recuperarXml: ' + platform);
   }
-  if (pkg.version !== version || pkg.name !== 'cosmemilton-acbr-node-' + platform + '-x64' || manifest.formatVersion !== 1 || manifest.sourceRevision !== generated.sourceRevision || manifest.contractHash !== generated.contractHash || manifest.platform !== platform || manifest.arch !== 'x64' || manifest.testOnly || build.testOnly ||
+  if (pkg.version !== version || pkg.name !== '@cosmemilton/acbr-node-' + platform + '-x64' || manifest.formatVersion !== 1 || manifest.sourceRevision !== generated.sourceRevision || manifest.contractHash !== generated.contractHash || manifest.platform !== platform || manifest.arch !== 'x64' || manifest.testOnly || build.testOnly ||
       build.sourceRevision !== generated.sourceRevision || build.sourceTreeHash !== lock.source.treeHash || GENERATED_FILES.some(name => manifest.generatedFileHashes[name] !== generated.fileHashes[name])) throw Error('Runtime incompatível, desatualizado ou destinado a testes: ' + platform);
   if (!manifest.files || typeof manifest.files !== 'object' || !Object.hasOwn(manifest.files, manifest.executable)) throw Error('Manifesto runtime não contém executável.');
   for (const [name, expected] of Object.entries(manifest.files)) {
