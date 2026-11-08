@@ -7,7 +7,7 @@
 // abort() solicita cancelamento no SDK; a consulta pode já ter sido enviada.
 // Isso não cancela a autorização fiscal.
 import { readFile } from 'node:fs/promises';
-import { criarEmissor, diagnosticarResultado } from 'cosmemilton-acbr-node';
+import { criarEmissor, diagnosticarResultado } from '@cosmemilton/acbr-node';
 
 export async function recuperarXmlDeArquivo({
   arquivoAssinado,

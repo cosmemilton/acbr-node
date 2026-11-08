@@ -14,8 +14,8 @@ const digest = (data, algorithm = 'sha1') => createHash(algorithm).update(data).
 const noStages = async () => null;
 
 function releaseEntries() {
-  return ['cosmemilton-acbr-node-linux-x64', 'cosmemilton-acbr-node-win32-x64', 'cosmemilton-acbr-node']
-    .map(name => ({ name, data: Buffer.from('approved ' + name), tarball: path.join('/reviewed', name + '-' + version + '.tgz') }));
+  return ['@cosmemilton/acbr-node-linux-x64', '@cosmemilton/acbr-node-win32-x64', '@cosmemilton/acbr-node']
+    .map(name => ({ name, data: Buffer.from('approved ' + name), tarball: path.join('/reviewed', name.replace(/^@/, '').replace('/', '-') + '-' + version + '.tgz') }));
 }
 
 function reviewedStage(entry) {
@@ -44,17 +44,17 @@ function stagedNpm(entry, options = {}) {
     assert.equal(args[2], stageId);
     assert.ok(config.cwd);
     directory = config.cwd;
-    const filename = options.filename ?? `${entry.name}-${version}-${stageId}.tgz`;
+    const filename = options.filename ?? `${entry.name.replace(/^@/, '').replace('/', '-')}-${version}-${stageId}.tgz`;
     await writeFile(path.join(directory, filename), options.data ?? entry.data);
     if (options.extraFile) await writeFile(path.join(directory, 'unexpected.tgz'), 'unexpected');
     return { code: 0, stdout: JSON.stringify({ [entry.name]: { name: entry.name, version, size: entry.data.length,
-      filename: `${entry.name}-${version}.tgz`, shasum: digest(entry.data) } }) };
+      filename: `${entry.name.replace(/^@/, '').replace('/', '-')}-${version}.tgz`, shasum: digest(entry.data) } }) };
   };
   return { stage, calls, npm, get directory() { return directory; } };
 }
 
 function manifest() {
-  const names = ['cosmemilton-acbr-node-linux-x64', 'cosmemilton-acbr-node-win32-x64', 'cosmemilton-acbr-node'];
+  const names = ['@cosmemilton/acbr-node-linux-x64', '@cosmemilton/acbr-node-win32-x64', '@cosmemilton/acbr-node'];
   return {
     formatVersion: 1, version: '0.1.0', baseUrl: 'https://miltonjunior.dev.br/acbr-node/releases/0.1.0/',
     validationSha256: 'a'.repeat(64), checksumsSha256: 'b'.repeat(64),
@@ -572,7 +572,7 @@ test('stagedArtifact refuses duplicate candidates and invalid list or view JSON 
 test('stagedArtifact refuses downloads with an unexpected filename or extra files and cleans them', async t => {
   const entry = releaseEntries()[0];
   for (const [label, options] of [
-    ['unexpected filename', { filename: `${entry.name}-${version}.tgz` }],
+    ['unexpected filename', { filename: `${entry.name.replace(/^@/, '').replace('/', '-')}-${version}.tgz` }],
     ['extra file', { extraFile: true }],
   ]) {
     await t.test(label, async () => {

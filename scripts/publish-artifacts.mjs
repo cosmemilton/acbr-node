@@ -17,7 +17,7 @@ await auditGenerated(root,generated,lock);
 const directories=[];
 for(const platform of ['linux','win32']){
  const directory=path.join(root,'packages','acbr-node-'+platform+'-x64');
- await auditRuntime(root,directory,platform,main.version,generated,lock);
+ await auditRuntime(root,directory,platform,main.optionalDependencies['@cosmemilton/acbr-node-'+platform+'-x64'],generated,lock);
  directories.push(directory);
 }
 const preview=JSON.parse(await run('npm',['pack','--json','--dry-run'],root,true))[0];

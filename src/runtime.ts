@@ -2,6 +2,7 @@ import { spawn, type ChildProcessWithoutNullStreams, type SpawnOptionsWithoutStd
 import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { resolveRuntimePackage } from './runtime-package.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { TextDecoder } from 'node:util';
 import { ErroAcbrNode, type DetalhesErroAcbr, type ConfiguracaoEmissor, type Contrato, type ConfiguracaoMotor, type RequisicaoMotor, type ResultadoFiscal, type RuntimeManifest, type OpcoesOperacao, type Consulta, type Cancelamento, type CartaCorrecao, type Inutilizacao } from './types.js';
@@ -32,8 +33,10 @@ async function resolveRuntime(directory: string | undefined, contract: Contrato)
   let root=directory;
   if(!root) {
     if(!['linux','win32'].includes(process.platform) || process.arch!=='x64') throw fail('PLATAFORMA_NAO_SUPORTADA','Esta versão exige Linux ou Windows x64.');
-    try { const require=createRequire(typeof __filename!=='undefined'?__filename:import.meta.url); root=path.join(path.dirname(require.resolve('cosmemilton-acbr-node-'+process.platform+'-x64/package.json')),'runtime'); }
-    catch { throw fail('RUNTIME_AUSENTE','Instale o pacote de runtime da plataforma ou informe runtimeDirectory.'); }
+    const require=createRequire(typeof __filename!=='undefined'?__filename:import.meta.url);
+    const packageJson=resolveRuntimePackage(require.resolve, process.platform);
+    if (packageJson) root=path.join(path.dirname(packageJson),'runtime');
+    if (!root) throw fail('RUNTIME_AUSENTE','Instale o pacote de runtime da plataforma ou informe runtimeDirectory.');
   }
   root=path.resolve(root);
   let m: RuntimeManifest;

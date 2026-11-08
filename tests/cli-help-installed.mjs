@@ -24,12 +24,12 @@ await writeFile(path.join(directory, 'installation.json'), JSON.stringify({ comm
   started: installStarted, finished: new Date().toISOString(), exitCode: installation.status, signal: installation.signal,
   error: installation.error?.message }, null, 2) + '\n');
 if (installation.error || installation.status !== 0) throw Error(`Offline preview installation failed (exit ${installation.status}).`);
-const pkgRoot = path.join(directory, 'node_modules/cosmemilton-acbr-node');
-for (const platform of ['linux', 'win32']) await assert.rejects(access(path.join(directory, `node_modules/cosmemilton-acbr-node-${platform}-x64`)), { code: 'ENOENT' });
+const pkgRoot = path.join(directory, 'node_modules/@cosmemilton/acbr-node');
+for (const platform of ['linux', 'win32']) await assert.rejects(access(path.join(directory, `node_modules/@cosmemilton/acbr-node-${platform}-x64`)), { code: 'ENOENT' });
 const tarballBytes = await readFile(tarball);
 const integrity = `sha512-${createHash('sha512').update(tarballBytes).digest('base64')}`;
 const lock = JSON.parse(await readFile(path.join(directory, 'package-lock.json'), 'utf8'));
-assert.equal(lock.packages['node_modules/cosmemilton-acbr-node'].integrity, integrity);
+assert.equal(lock.packages['node_modules/@cosmemilton/acbr-node'].integrity, integrity);
 const pkg = JSON.parse(await readFile(path.join(pkgRoot, 'package.json'), 'utf8'));
 const contract = JSON.parse(await readFile(path.join(pkgRoot, 'dist/contract.json'), 'utf8'));
 const types = new Map(contract.ir.types.map(type => [type.name, type]));
